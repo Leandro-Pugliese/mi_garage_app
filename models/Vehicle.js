@@ -18,7 +18,7 @@ const vehicleSchema = new mongoose.Schema({
         required: true
     },
     year: {
-        type: Date, 
+        type: Number, 
         required: true
     },
     patente: {

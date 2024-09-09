@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const createVehicle = async (req, res) => {
-    const {body} = req; //tipoVehiculo, marca, modelo, year, patente, combustible, seguro, uso, kilometraje
+    const {body} = req; //tipoVehiculo, marca, modelo, year, patente, combustible, gnc, seguro, uso, kilometraje
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -16,6 +16,12 @@ const createVehicle = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
+        // Si el usuario no es premium solo puede tener un vehiculo.
+        let vehiculosUsuario = [...user.vehiculos];
+        if ((vehiculosUsuario.length === 1) && (user.premium === false)) {
+            return res.status(403).send("Para agregar más de un vehículo tienes que ser premium.");
+        }
+        //Creamos el vehículo
         const vehicle = await Vehicles.create({
             usuario: user._id.toString(),
             tipo: body.tipoVehiculo,
@@ -32,6 +38,15 @@ const createVehicle = async (req, res) => {
             creado: new Date(Date.now()),
             actualizado: new Date(Date.now())
         })
+        //Agregamos el vehículo a la lista del usuario.
+        vehiculosUsuario.push(vehicle._id.toString());
+        await Users.updateOne({_id: user._id},
+            {
+                $set: {
+                    vehiculos: vehiculosUsuario
+                }
+            }
+        )
         const msj = "Vehículo agregado exitosamente";
         return res.status(200).send({vehicle, msj});
     } catch (error) {
@@ -67,7 +82,7 @@ const vehicleList = async (req, res) => {
         if (!vehicles) {
             return res.status(403).send("No se encontraron vehículos en la base de datos.");
         }
-        const userVehicles = vehicles.filter((vehicle) => vehicle.usuario === user._id);
+        const userVehicles = vehicles.filter((vehicle) => vehicle.usuario === user._id.toString());
         return res.status(200).send(userVehicles);
     } catch (error) {
         return res.status(500).send(error.message);
@@ -98,6 +113,7 @@ const updateVehicle = async (req, res) => {
                 }
             }
         )
+        return res.status(200).send("Datos del vehículo modificados exitosamente");
     } catch (error) {
         return res.status(500).send(error.message);
     }
