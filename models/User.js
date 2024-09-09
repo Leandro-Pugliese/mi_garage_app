@@ -22,6 +22,10 @@ const userSchema = new mongoose.Schema({
         type: [],
         required: true
     },
+    categorias: {
+        type: [],
+        required: true
+    },
     ingresos: {
         type: Number,
         required: true

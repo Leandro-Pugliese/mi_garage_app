@@ -1,5 +1,6 @@
 const express = require("express");
 const Users = require("../models/User");
+const Activities = require("../models/Activity");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -25,6 +26,7 @@ const createUser = async (req, res) => {
             premium: false,
             vencimientoPremium: new Date(Date.now()),
             vehiculos: [],
+            categorias: ["MANTENIMIENTO", "SEGURO", "VERIFCACIÓN TÉCNICA", "PATENTE", "GNC", "OTROS"],
             ingresos: 0,
             ultimaConexion: new Date(Date.now()),
             pais: body.pais,
@@ -142,6 +144,59 @@ const updatePassword = async (req, res) => {
     }
 }
 
+const updateCategorias = async (req, res) => {
+    const {body} = req; //operacion("ADD"/"REMOVE"), categoria.
+    try {
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id});
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
+        let categorias = [...user.categorias];
+        if (body.operacion === "ADD") {
+             // Chequeo que no este repetida la categoría.
+             if (categorias.includes(body.categoria) === true) {
+                return res.status(403).send("La categoría ya esta registrada.");
+            }
+            // Agrego la categoría ingresada.
+            categorias.push(body.categoria);
+        } else if (body.operacion === "REMOVE") {
+            // Tengo que chequear si esa categoría no se utiliza en alguna actividad antes de borrarla.
+            const activities = await Activities.find();
+            const userActivities = activities.filter((activity) => activity.usuario === user._id);
+            // Filtro las actividades del usuario con la categoría que quiere eliminar.
+            const categoriaUtilizada = userActivities.filter((activity) => activity.tipo === body.categoria);
+            if (categoriaUtilizada.length >= 1) { // Si hay al menos una actividad con esa categoría no la podes borrar.
+                return res.status(403).send("No es posible eliminar esta categoría porque hay actividades en la base de datos que pertenecen a la misma, modifica la categoría de esas actividades para poder eliminarla.");
+            }
+            // En caso de que se pueda borrar, la quitamos de la lista.
+            for (let indice in categorias){
+                let categoriaOriginal = categorias[indice];
+                if (categoriaOriginal === body.categoria) {
+                    categorias.splice(indice, 1);
+                }
+            }
+            // Hago el update del usuario con las categorias modificadas.
+            await Users.updateOne({_id: user._id},
+                {
+                    $set: {
+                        categorias: categorias
+                    }
+                }
+            )
+            return res.status(200).send("Categorías modificadas exitosamente.");
+        } else {
+            return res.status(403).send("Tipo de operación no definido.");
+        }
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
 const sendEmailValidation = async (req, res) => {
     try {
         const token = req.header("Authorization");
@@ -251,5 +306,5 @@ const resetPassword = async (req, res) => {
     }
 }
 
-module.exports = { createUser, loginUser, userData, updateUser, updatePassword, sendEmailValidation, 
+module.exports = { createUser, loginUser, userData, updateUser, updatePassword, updateCategorias, sendEmailValidation, 
                    emailValidation, forgotPassword, resetPassword }
