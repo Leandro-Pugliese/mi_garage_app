@@ -25,6 +25,10 @@ const activitySchema = new mongoose.Schema({
         type: Date, 
         required: true
     },
+    imagen: {
+        url: String,
+        public_id: String
+    },
     proximaFecha: {
         type: {},
         required: true
