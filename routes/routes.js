@@ -4,7 +4,7 @@ const {isAuthenticated} = require("../authentication/authentication");
 const {isPremium} = require("../authentication/premiumVerification");
 const {createUser, loginUser, userData, updateUser, updatePassword, updateCategorias, sendEmailValidation, emailValidation, forgotPassword, resetPassword} = require("../controllers/user.controller");
 const {createVehicle, vehicleData, vehicleList, updateVehicle} = require("../controllers/vehicle.controller");
-const {createActivity, createActivityPremium, updateActivity, deleteActivity} = require("../controllers/activity.controller");
+const {createActivity, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
 
 // User routes.
@@ -29,6 +29,7 @@ router.put("/vehicle/update", isAuthenticated, updateVehicle);
 router.post("/activity/create", isAuthenticated, createActivity);
 router.post("/activity/create-premium", isPremium, uploadImagen, createActivityPremium);
 router.put("/activity/update", isAuthenticated, updateActivity);
+router.put("/activity/update-premium", isPremium, uploadImagen, updateActivityPremium);
 router.delete("/activity/delete", isAuthenticated, deleteActivity);
 
 // Non-existent routes.
