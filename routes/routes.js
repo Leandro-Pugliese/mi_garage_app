@@ -1,9 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const {isAuthenticated} = require("../authentication/authentication");
+const {isPremium} = require("../authentication/premiumVerification");
 const {createUser, loginUser, userData, updateUser, updatePassword, updateCategorias, sendEmailValidation, emailValidation, forgotPassword, resetPassword} = require("../controllers/user.controller");
 const {createVehicle, vehicleData, vehicleList, updateVehicle} = require("../controllers/vehicle.controller");
-const {createActivity, updateActivity, deleteActivity} = require("../controllers/activity.controller");
+const {createActivity, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
+const {uploadImagen} = require("../assets/multer");
 
 // User routes.
 router.post("/user/create", createUser);
@@ -25,7 +27,9 @@ router.put("/vehicle/update", isAuthenticated, updateVehicle);
 
 // Activity routes.
 router.post("/activity/create", isAuthenticated, createActivity);
+router.post("/activity/create-premium", isPremium, uploadImagen, createActivityPremium);
 router.put("/activity/update", isAuthenticated, updateActivity);
+router.put("/activity/update-premium", isPremium, uploadImagen, updateActivityPremium);
 router.delete("/activity/delete", isAuthenticated, deleteActivity);
 
 // Non-existent routes.
