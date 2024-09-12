@@ -3,7 +3,7 @@ const router = express.Router();
 const {isAuthenticated} = require("../authentication/authentication");
 const {isPremium} = require("../authentication/premiumVerification");
 const {createUser, loginUser, userData, updateUser, updatePassword, updateCategorias, sendEmailValidation, emailValidation, forgotPassword, resetPassword} = require("../controllers/user.controller");
-const {createVehicle, vehicleData, vehicleList, updateVehicle} = require("../controllers/vehicle.controller");
+const {createVehicle, vehicleData, vehicleList, updateVehicle, updateVehicleKm} = require("../controllers/vehicle.controller");
 const {createActivity, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
 
@@ -21,9 +21,10 @@ router.put("/user/forgot-password/:id/:token", resetPassword);
 
 // Vehicle routes.
 router.post("/vehicle/create", isAuthenticated, createVehicle);
-router.post("/vehicle/data", isAuthenticated, vehicleData);
+router.get("/vehicle/data/:id", isAuthenticated, vehicleData);
 router.get("/vehicle/list", isAuthenticated, vehicleList);
 router.put("/vehicle/update", isAuthenticated, updateVehicle);
+router.put("/vehicle/update-km", isAuthenticated, updateVehicleKm);
 
 // Activity routes.
 router.post("/activity/create", isAuthenticated, createActivity);

@@ -57,6 +57,10 @@ const vehicleSchema = new mongoose.Schema({
         type: Date, 
         required: true
     },
+    kilometrajeActualizado: {
+        type: Date, 
+        required: true
+    },
 }, {versionKey: false});
 
 const Vehicle = mongoose.model("Vehicle", vehicleSchema);
