@@ -40,6 +40,10 @@ const activitySchema = new mongoose.Schema({
     activo: {
         type: Boolean,
         required: true
+    },
+    avisos: {
+        type: {},
+        required: true
     }
 }, {versionKey: false});
 

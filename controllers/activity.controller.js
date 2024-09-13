@@ -43,7 +43,11 @@ const createActivity = async (req, res) => {
                 tiene: body.tieneProximoKilometraje === "SI",
                 kilometraje: Number(body.proximoKilometraje)
             },
-            activo: true
+            activo: true,
+            avisos: {
+                cantidad: 0,
+                ultimoAviso: null
+            }
         })
         const vehicleActivities = [...vehicle.actividades];
         vehicleActivities.push(activity._id.toString());
@@ -122,7 +126,11 @@ const createActivityPremium = async (req, res) => {
                 tiene: body.tieneProximoKilometraje === "SI",
                 kilometraje: Number(body.proximoKilometraje)
             },
-            activo: true
+            activo: true,
+            avisos: {
+                cantidad: 0,
+                ultimoAviso: null
+            }
         })
         const vehicleActivities = [...vehicle.actividades];
         vehicleActivities.push(activity._id.toString());
@@ -163,14 +171,14 @@ const updateActivity = async (req, res) => { //Ruta solo para actividades sin im
                         public_id: ""
                     },
                     proximaFecha: {
-                        tiene: body.tieneProximaFecha,
-                        fecha: body.proximaFecha
+                        tiene: body.tieneProximaFecha === "SI",
+                        fecha: new Date(body.proximaFecha)
                     },
                     proximoKilometraje: {
-                        tiene: body.tieneProximoKilometraje,
-                        kilometraje: body.proximoKilometraje
+                        tiene: body.tieneProximoKilometraje === "SI",
+                        kilometraje: Number(body.proximoKilometraje)
                     },
-                    activo: body.activo
+                    activo: body.activo === "SI"
                 }
             }
         )
