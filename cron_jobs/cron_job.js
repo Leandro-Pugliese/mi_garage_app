@@ -2,6 +2,7 @@ const express = require("express");
 const Users = require("../models/User");
 const Vehicles = require("../models/Vehicle");
 const Activities = require("../models/Activity");
+const schedule = require('node-schedule');
 const { differenceInDays, subDays, isAfter, isBefore } = require('date-fns');
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND);
@@ -155,7 +156,7 @@ const checkActivity = async (req, res) => {
                                                         Debes realizarla antes del ${expiryDate.toLocaleDateString()}.</strong>
                                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.<p/>`;
                                         }
-                                        if (html) {
+                                        if (msjHtml) {
                                             //Envio el correo.
                                             const { error } = await resend.emails.send({
                                                 from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
@@ -192,5 +193,26 @@ const checkActivity = async (req, res) => {
     }
 }
 
+//Cron-job para ejecutarse los miercoles y domingos a las 22hs.
+const cronJob = () => {
+    schedule.scheduleJob({ hour: 22, minute: 0, dayOfWeek: [0,1, 3] }, () => {
+        console.log('Ejecutando tarea del miercoles y domingos a las 22:00hs');
+        checkKm();
+    })
+}
+//Cron-job para ejecutarse todos los días a la medianoche.
+const cronJob1 = () => {
+    schedule.scheduleJob({ hour: 0, minute: 0, dayOfWeek: [0, 1, 2, 3, 4, 5, 6] }, () => {
+        console.log('Ejecutando tarea todos los dias a la medianoche');
+        checkPremium();
+    })
+}
+//Cron-job para ejecutarse todos los días a las 6am.
+const cronJob2 = () => { 
+    schedule.scheduleJob({ hour: 6, minute: 0, dayOfWeek: [0, 1, 2, 3, 4, 5, 6] }, () => {
+        console.log('Ejecutando tarea todos los dias a las 6am');
+        checkActivity();
+    })
+}
 
-module.exports = {checkKm, checkActivity, checkPremium}
+module.exports = {cronJob, cronJob1, cronJob2}
