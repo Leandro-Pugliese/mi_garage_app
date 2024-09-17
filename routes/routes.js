@@ -6,7 +6,7 @@ const {createUser, loginUser, userData, updateUser, updatePassword, updateCatego
 const {createVehicle, vehicleData, vehicleList, updateVehicle, updateVehicleKm} = require("../controllers/vehicle.controller");
 const {createActivity, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
-const {createPreference, paymentNotification} = require("../assets/mercadoPago");
+const {createPreference, paymentNotification, paymentRedirect} = require("../assets/mercadoPago");
 
 // User routes.
 router.post("/user/create", createUser);
@@ -37,7 +37,7 @@ router.delete("/activity/delete", isAuthenticated, deleteActivity);
 // Mercado pago routes
 router.post("/buy/premium", isAuthenticated, createPreference);
 router.post("/check/payment", paymentNotification);
-
+router.get("/check/payment-redirect", paymentRedirect);
 // Non-existent routes.
 router.get("*", (req, res) => {
     return res.status(404).send("¡Esta página no existe!")

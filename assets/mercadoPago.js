@@ -3,15 +3,7 @@ const { MercadoPagoConfig } = require("mercadopago");
 require("dotenv").config();
 const Users = require("../models/User");
 const jwt = require("jsonwebtoken");
-
-// Configuración de credenciales.
-// mercadopago.configurations.setAccessToken(process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA);
-// const client = new MercadoPagoConfig({
-//     access_token: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA
-// });
-// mercadopago.configurations = new mercadopago.MercadoPagoConfig({
-//     access_token: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA
-// });
+const axios = require("axios");
 
 const createPreference = async (req, res) => {
     const token = req.header("Authorization");
@@ -36,7 +28,7 @@ const createPreference = async (req, res) => {
             },
             external_reference: userId, //ID para actualizar el usuario si el pago es aprobado.
             back_urls: {
-                success: 'https://leandro-pugliese.com',
+                success: `https://www.leandro-pugliese.com`,
                 failure: 'https://cambio-hoy.vercel.app',
                 pending: 'https://easy-qr-generator-chi.vercel.app'
             },
@@ -46,7 +38,7 @@ const createPreference = async (req, res) => {
     try {
         const response = await preference.create(data);
         const init_point = response.sandbox_init_point || response.init_point;
-        res.status(200).send({ init_point });
+        res.status(200).send({ init_point, response });
     } catch (error) {
         console.error(error);
         res.status(500).send({ error: 'Error al crear la preferencia de pago' });
@@ -55,26 +47,51 @@ const createPreference = async (req, res) => {
 
 const paymentNotification = async (req, res) => {
     try {
-        const payment = req.body;
-        // Verifico si el pago fue exitoso.
-        if (payment.type === 'payment' && payment.data.status === 'approved') {
-            const userId = payment.data.external_reference;  // Identifico al usuario con `external_reference`
-            console.log(userId)
-            // Update usuario a premium.
-            await Users.updateOne({_id: userId},
+        const paymentData = req.body;
+        console.log('Webhook recibido:', paymentData);
+        // Verifico el estado del pago.
+        if (paymentData.action === 'payment.created' && paymentData.data.status === 'approved') {
+            // Actualiza el usuario a premium
+            const userId = paymentData.data.external_reference || paymentData.external_reference;
+            const user = await Users.findOne({_id: userId});
+            if (user) {
+                await Users.updateOne({_id: userId},
+                    {
+                        $set: {
+                            premium: true,
+                            vencimientoPremium: new Date(Date.now())
+                        }
+                    }
+                )
+            }
+        }
+        // Respuesta  200 OK para que Mercado Pago sepa que recibi la notificación.
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('Error al actualizar el usuario:', error);
+        return res.status(500).send(error);
+    }
+}
+
+const paymentRedirect = async (req, res) => {
+    try {
+        const data = req.query;
+        if (data.status === "approved") {
+            await Users.updateOne({_id: data.external_reference},
                 {
                     $set: {
-                        premium: true
+                        premium: true,
+                        vencimientoPremium: new Date(Date.now())
                     }
                 }
             )
-            return res.status(200).send('Usuario actualizado a premium');
+            return res.status(200).send("Membresía premium activada");
         } else {
-            return res.status(400).send('Pago no aprobado');
-        } 
+            return res.status(403).send("payment status error");
+        }
     } catch (error) {
-        console.error('Error al actualizar el usuario:', error);
-        return res.status(500).send('Error al actualizar el usuario');
+        console.log(error)
+        return res.status(500).send("Error al obtener información del pago");
     }
 }
-module.exports = {createPreference, paymentNotification}
+module.exports = {createPreference, paymentNotification, paymentRedirect}
