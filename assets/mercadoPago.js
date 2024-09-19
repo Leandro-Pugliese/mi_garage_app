@@ -2,8 +2,12 @@ const mercadopago = require('mercadopago');
 const { MercadoPagoConfig } = require("mercadopago");
 require("dotenv").config();
 const Users = require("../models/User");
+const Payments = require("../models/Payments");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
+const { add } = require('date-fns');
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND);
 
 const createPreference = async (req, res) => {
     const token = req.header("Authorization");
@@ -55,11 +59,13 @@ const paymentNotification = async (req, res) => {
             const userId = paymentData.data.external_reference || paymentData.external_reference;
             const user = await Users.findOne({_id: userId});
             if (user) {
+                const currentDate = new Date(Date.now());
+                const nextExpiryDate = add(currentDate, { months: 1 });
                 await Users.updateOne({_id: userId},
                     {
                         $set: {
                             premium: true,
-                            vencimientoPremium: new Date(Date.now())
+                            vencimientoPremium: new Date(nextExpiryDate)
                         }
                     }
                 )
@@ -77,14 +83,41 @@ const paymentRedirect = async (req, res) => {
     try {
         const data = req.query;
         if (data.status === "approved") {
+            const isPayment = await Payments.findOne({paymentId: data.payment_id});
+            if (isPayment) {
+                return res.status(403).send("Este id de pago ya fue utilizado.");
+            }
+            const user = await Users.findOne({_id: data.external_reference});
+            if (!user) {
+                return res.status(403).send("Usuario no encontrado en la base de datos, porfavor contactar soporte.");
+            }
+            await Payments.create({
+                usuario: user._id.toString(),
+                paymentId: data.payment_id,
+                paymentType: data.payment_type,
+                paymentDate: new Date(Date.now())
+            })
+            const currentDate = new Date(Date.now());
+            const nextExpiryDate = add(currentDate, { months: 1 });
             await Users.updateOne({_id: data.external_reference},
                 {
                     $set: {
                         premium: true,
-                        vencimientoPremium: new Date(Date.now())
+                        vencimientoPremium: new Date(nextExpiryDate)
                     }
                 }
             )
+            const { error } = await resend.emails.send({
+                from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
+                to: [user.email],
+                subject: 'Membresía premium activada',
+                html: ` <strong>¡Hola, este correo es para informarte que tu membresía premium fue activada exitosamente!</strong>
+                        <br><strong>Fecha de vencimiento: ${user.vencimientoPremium.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y aprovechar al máximo las funcionalidades tu membresía premium.</strong>
+                        <br><p>Si no activaste tu membresía premium o no estas registrado en "Mi Garage", avisa al <a href="http://localhost:3000">STAFF</a> de inmediato.</p>`,
+            });
+            if (error) {
+                console.log(error);
+            }
             return res.status(200).send("Membresía premium activada");
         } else {
             return res.status(403).send("payment status error");

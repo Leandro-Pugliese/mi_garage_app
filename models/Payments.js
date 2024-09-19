@@ -1,0 +1,24 @@
+const mongoose = require("mongoose");
+
+const paymentsSchema = new mongoose.Schema({
+    usuario: {
+        type: String,
+        required: true
+    },
+    paymentId: {
+        type: String,
+        required: true
+    },
+    paymentType: {
+        type: String,
+        required: true
+    },
+    paymentDate: {
+        type: Date,
+        required: true
+    }
+}, {versionKey: false});
+
+const Payment = mongoose.model("Payment", paymentsSchema);
+
+module.exports = Payment;

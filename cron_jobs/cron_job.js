@@ -193,9 +193,49 @@ const checkActivity = async (req, res) => {
     }
 }
 
+const removePremium = async (req, res) => {
+    try {
+        const users = await Users.find();
+        if (users.length === 0) {
+            return
+        }
+        const premiumUsers = users.filter((user) => user.premium === true);
+        if (premiumUsers.length === 0) {
+            return
+        }
+        const currentDate = new Date(Date.now());
+        for (let i=0; i < premiumUsers.length; i++) {
+            const premiumExpiryDate = new Date(premiumUsers[i].vencimientoPremium);
+            if (isBefore(premiumExpiryDate, currentDate)) {
+                await Users.updateOne({_id: premiumUsers[i]._id},
+                    {
+                        $set: {
+                            premium: false
+                        }
+                    }
+                )
+                const { error } = await resend.emails.send({
+                    from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
+                    to: [premiumUsers[i].email],
+                    subject: 'Membresía premium vencida',
+                    html: ` <strong>¡Hola, este correo es para informarte que tu membresía premium venció!</strong>
+                            <br><strong>Fecha de vencimiento: ${users[i].vencimientoPremium.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y renovar tu membresía premium para seguir aprovenchando al máximo las funcionalidades de la app.</strong>
+                            <br><p>Si ya renovaste tu membresía premium o no te interesa tener una ignora este email.</p>
+                            <br><p>Si no estas registrado en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
+                });
+                if (error) {
+                    console.log(error);
+                }
+            }
+        }
+    } catch (error) {
+        console.log(error.message);
+    }
+}
+
 //Cron-job para ejecutarse los miercoles y domingos a las 22hs.
 const cronJob = () => {
-    schedule.scheduleJob({ hour: 22, minute: 0, dayOfWeek: [0,1, 3] }, () => {
+    schedule.scheduleJob({ hour: 22, minute: 0, dayOfWeek: [0, 3] }, () => {
         console.log('Ejecutando tarea del miercoles y domingos a las 22:00hs');
         checkKm();
     })
@@ -214,5 +254,12 @@ const cronJob2 = () => {
         checkActivity();
     })
 }
+//Cron-job para ejecutarse todos los días a las 4am.
+const cronJob3 = () => { 
+    schedule.scheduleJob({ hour: 5, minute: 30, dayOfWeek: [0, 1, 2, 3, 4, 5, 6] }, () => {
+        console.log('Ejecutando tarea todos los dias a las 5:30am');
+        removePremium();
+    })
+}
 
-module.exports = {cronJob, cronJob1, cronJob2}
+module.exports = {cronJob, cronJob1, cronJob2, cronJob3}
