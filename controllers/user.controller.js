@@ -11,7 +11,7 @@ const resend = new Resend(process.env.RESEND);
 const signToken = (_id, email) => jwt.sign({_id, email}, process.env.JWT_CODE);
 
 const createUser = async (req, res) => {
-    const {body} = req; //email, pais, provincia, localidad, password
+    const {body} = req; //email, pais, provincia, telefono, password
     try {
         const emailUser = body.email.toLowerCase();
         const isUser = await Users.findOne({email: emailUser});
@@ -31,7 +31,7 @@ const createUser = async (req, res) => {
             ultimaConexion: new Date(Date.now()),
             pais: body.pais,
             provincia: body.provincia,
-            localidad: body.localidad,
+            telefono: body.telefono || 0,
             password: hashed, salt
         })
         const token = signToken(user._id, user.email);
@@ -87,7 +87,7 @@ const userData = async (req, res) => {
 }
 
 const updateUser = async (req, res) => {
-    const {body} = req; //pais, provincia, localidad.
+    const {body} = req; //pais, provincia, telefono.
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -103,7 +103,7 @@ const updateUser = async (req, res) => {
                 $set: {
                     pais: body.pais,
                     provincia: body.provincia,
-                    localidad: body.localidad
+                    telefono: body.telefono
                 }
             }
         )

@@ -42,8 +42,8 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    localidad: {
-        type: String,
+    telefono: {
+        type: Number,
         required: true
     },
     password: {
