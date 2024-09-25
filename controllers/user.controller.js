@@ -219,12 +219,14 @@ const sendEmailValidation = async (req, res) => {
         const { error } = await resend.emails.send({
             from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
             to: [user.email],
-            subject: 'Verificación de Correo Mi Garage',
-            html: ` <strong>Ingresa en el siguiente link para verificar tu correo: <a href="http://localhost:3000/validation/${link}">Click Aqui</a></strong>
+            subject: 'Verificación de Correo',
+            html: ` <strong>Ingresa en el siguiente link para verificar tu correo: <a href="http://localhost:3000/user/${link}">Click Aqui</a></strong>
+                    <br><p>Este es un email automático, no debes responderlo.</p>       
                     <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
         });
         if (error) {
-            return res.status(403).send(error);
+            console.log(error)
+            return res.status(403).send("Error al enviar el email.");
         }
         return res.status(200).send("Enviamos un email para verificar tu correo.");
     } catch (error) {
