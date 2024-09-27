@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const createVehicle = async (req, res) => {
-    const {body} = req; //tipoVehiculo, marca, modelo, year, patente, combustible, gnc, seguro, uso, kilometraje
+    const {body} = req; //type, brand, model, year, patente, fuel, gnc, seguro, use, km
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -30,7 +30,7 @@ const createVehicle = async (req, res) => {
             year: body.year,
             patente: body.patente,
             combustible: body.fuel,
-            gnc: body.gnc,
+            gnc: body.gnc === "SI",
             seguro: body.seguro,
             uso: body.use,
             kilometraje: body.km,
