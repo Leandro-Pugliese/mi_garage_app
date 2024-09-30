@@ -1,47 +1,47 @@
 const mongoose = require("mongoose");
 
 const activitySchema = new mongoose.Schema({
-    usuario: {
+    user: {
         type: String,
         required: true
     },
-    vehiculo: {
+    vehicle: {
         type: String,
         required: true
     },
-    tipo: {
+    type: {
         type: String,
         required: true
     },
-    descripcion: {
+    description: {
         type: String,
         required: true
     },
-    kilometraje: {
+    km: {
         type: Number,
         required: true
     },
-    fecha: {
+    DataTransferItem: {
         type: Date, 
         required: true
     },
-    imagen: {
+    image: {
         url: String,
         public_id: String
     },
-    proximaFecha: {
+    nextDate: {
         type: {},
         required: true
     },
-    proximoKilometraje: {
+    nextKm: {
         type: {},
         required: true
     },
-    activo: {
+    active: {
         type: Boolean,
         required: true
     },
-    avisos: {
+    notices: {
         type: {},
         required: true
     }

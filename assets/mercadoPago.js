@@ -65,7 +65,7 @@ const paymentNotification = async (req, res) => {
                     {
                         $set: {
                             premium: true,
-                            vencimientoPremium: new Date(nextExpiryDate)
+                            premiumExpiration: new Date(nextExpiryDate)
                         }
                     }
                 )
@@ -92,7 +92,7 @@ const paymentRedirect = async (req, res) => {
                 return res.status(403).send("Usuario no encontrado en la base de datos, porfavor contactar soporte.");
             }
             await Payments.create({
-                usuario: user._id.toString(),
+                user: user._id.toString(),
                 paymentId: data.payment_id,
                 paymentType: data.payment_type,
                 paymentDate: new Date(Date.now())
@@ -103,7 +103,7 @@ const paymentRedirect = async (req, res) => {
                 {
                     $set: {
                         premium: true,
-                        vencimientoPremium: new Date(nextExpiryDate)
+                        premiumExpiration: new Date(nextExpiryDate)
                     }
                 }
             )

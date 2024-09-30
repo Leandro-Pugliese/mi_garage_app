@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const paymentsSchema = new mongoose.Schema({
-    usuario: {
+    user: {
         type: String,
         required: true
     },

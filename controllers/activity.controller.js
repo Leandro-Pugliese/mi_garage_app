@@ -9,7 +9,8 @@ const streamifier = require('streamifier');
 
 
 const createActivity = async (req, res) => {
-    const {body} = req; //vehiculoID, tipo, descripcion, kilometraje, fecha, tieneProximaFecha, proximaFecha, tieneProximoKilometraje, proximoKilometraje.
+    const {id} = req.params;
+    const {body} = req; //type, description, km, date, isNextDate, nextDate, isNextKm, nextKm.
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -20,42 +21,42 @@ const createActivity = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        const vehicle = await Vehicles.findOne({_id: body.vehiculoID});
+        const vehicle = await Vehicles.findOne({_id: id});
         if (!vehicle) {
             return res.status(403).send("Vehículo no encontrado en la base de datos.");
         }
         const activity = await Activities.create({
-            usuario: user._id.toString(),
-            vehiculo: vehicle._id.toString(),
-            tipo: body.tipo,
-            descripcion: body.descripcion,
-            kilometraje: Number(body.kilometraje),
-            fecha: new Date(body.fecha),
-            imagen: {
+            user: user._id.toString(),
+            vehicle: vehicle._id.toString(),
+            type: body.type,
+            description: body.description,
+            km: Number(body.km),
+            date: new Date(body.date),
+            image: {
                 url: "",
                 public_id: ""
             },
-            proximaFecha: {
-                tiene: body.tieneProximaFecha === "SI",
-                fecha: new Date(body.proximaFecha)
+            nextDate: {
+                tiene: body.isNextDate === "SI",
+                date: new Date(body.proximaFecha)
             },
-            proximoKilometraje: {
-                tiene: body.tieneProximoKilometraje === "SI",
-                kilometraje: Number(body.proximoKilometraje)
+            nextKm: {
+                tiene: body.isNextKm === "SI",
+                km: Number(body.nextKm)
             },
-            activo: true,
-            avisos: {
+            active: true,
+            notices: {
                 cantidad: 0,
-                ultimoAviso: null
+                lastNotice: null
             }
         })
-        const vehicleActivities = [...vehicle.actividades];
+        const vehicleActivities = [...vehicle.activities];
         vehicleActivities.push(activity._id.toString());
         await Vehicles.updateOne({_id: vehicle._id},
             {
                 $set: {
-                    actividades: vehicleActivities,
-                    actualizado: new Date(Date.now())
+                    activities: vehicleActivities,
+                    updated: new Date(Date.now())
                 }
             }
         )
@@ -82,7 +83,8 @@ const uploadToCloudinary = (buffer) => {
 };
 
 const createActivityPremium = async (req, res) => {
-    const {body} = req; //vehiculoID, tipo, descripcion, kilometraje, fecha, tieneProximaFecha, proximaFecha, tieneProximoKilometraje, proximoKilometraje.
+    const {id} = req.params;
+    const {body} = req; //type, description, km, date, isNextDate, nextDate, isNextKm, nextKm.
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -93,7 +95,7 @@ const createActivityPremium = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        const vehicle = await Vehicles.findOne({_id: body.vehiculoID});
+        const vehicle = await Vehicles.findOne({_id: id});
         if (!vehicle) {
             return res.status(403).send("Vehículo no encontrado en la base de datos.");
         }
@@ -108,37 +110,37 @@ const createActivityPremium = async (req, res) => {
             imageId = uploadedImage.public_id; // ID de la imagen.
         }
         const activity = await Activities.create({
-            usuario: user._id.toString(),
-            vehiculo: vehicle._id.toString(),
-            tipo: body.tipo,
-            descripcion: new Date(body.descripcion),
-            kilometraje: Number(body.kilometraje),
-            fecha: body.fecha,
-            imagen: {
+            user: user._id.toString(),
+            vehicle: vehicle._id.toString(),
+            type: body.tipo,
+            description: new Date(body.descripcion),
+            km: Number(body.kilometraje),
+            date: body.fecha,
+            image: {
                 url: imageUrl,
                 public_id: imageId
             },
-            proximaFecha: {
+            nextDate: {
                 tiene: body.tieneProximaFecha === "SI",
                 fecha: new Date(body.proximaFecha)
             },
-            proximoKilometraje: {
+            nextKm: {
                 tiene: body.tieneProximoKilometraje === "SI",
                 kilometraje: Number(body.proximoKilometraje)
             },
-            activo: true,
-            avisos: {
+            active: true,
+            notices: {
                 cantidad: 0,
-                ultimoAviso: null
+                lastNotice: null
             }
         })
-        const vehicleActivities = [...vehicle.actividades];
+        const vehicleActivities = [...vehicle.activities];
         vehicleActivities.push(activity._id.toString());
         await Vehicles.updateOne({_id: vehicle._id},
             {
                 $set: {
-                    actividades: vehicleActivities,
-                    actualizado: new Date(Date.now())
+                    activities: vehicleActivities,
+                    updated: new Date(Date.now())
                 }
             }
         )
@@ -150,35 +152,36 @@ const createActivityPremium = async (req, res) => {
 }
 
 const updateActivity = async (req, res) => { //Ruta solo para actividades sin imagen.
-    const {body} = req; //actividadID, tipo, descripcion, kilometraje, fecha, proximaFecha, proximoKilometraje, activo.
+    const {id} = req.params;
+    const {body} = req; //type, description, km, date, nextDate, nextkm, active.
     try {
-        const activity = await Activities.findOne({_id: body.actividadID});
+        const activity = await Activities.findOne({_id: id});
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
-        if (activity.imagen.public_id !== "") {
+        if (activity.image.public_id !== "") {
             return res.status(403).send("Esta actividad tiene una imagen asociada, tienes que usar otra ruta para modificarla.");
         }
         await Activities.updateOne({_id: activity._id},
             {
                 $set: {
-                    tipo: body.tipo,
-                    descripcion: body.descripcion,
-                    kilometraje: body.kilometraje,
-                    fecha: body.fecha,
-                    imagen: {
+                    type: body.type || activity.type,
+                    description: body.description || activity.description,
+                    km: body.km || activity.km,
+                    date: new Date(body.date) || activity.date,
+                    image: {
                         url: "",
                         public_id: ""
                     },
-                    proximaFecha: {
-                        tiene: body.tieneProximaFecha === "SI",
-                        fecha: new Date(body.proximaFecha)
+                    nextDate: {
+                        tiene: body.isNextDate === "SI",
+                        fecha: new Date(body.nextDate) || new Date()
                     },
-                    proximoKilometraje: {
-                        tiene: body.tieneProximoKilometraje === "SI",
-                        kilometraje: Number(body.proximoKilometraje)
+                    nextKm: {
+                        tiene: body.isNextKm === "SI",
+                        kilometraje: Number(body.nextKm) || 0
                     },
-                    activo: body.activo === "SI"
+                    active: body.active === "SI"
                 }
             }
         )
@@ -189,15 +192,16 @@ const updateActivity = async (req, res) => { //Ruta solo para actividades sin im
 }
 
 const updateActivityPremium = async (req, res) => {
-    const {body} = req; //actividadID, tipo, descripcion, kilometraje, fecha, proximaFecha, proximoKilometraje, activo.
+    const {id} = req.params;
+    const {body} = req; //type, description, km, date, nextDate, nextkm, active.
     try {
-        const activity = await Activities.findOne({_id: body.actividadID});
+        const activity = await Activities.findOne({_id: id});
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
         // Si no se carga imagen lo dejo vacio.
-        let imageUrl = "";
-        let imageId = "";
+        let imageUrl = null;
+        let imageId = null;
         // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary.
         if (req.file !== undefined) {
             const image = req.file.buffer;
@@ -207,23 +211,23 @@ const updateActivityPremium = async (req, res) => {
             await Activities.updateOne({_id: activity._id},
                 {
                     $set: {
-                        tipo: body.tipo,
-                        descripcion: body.descripcion,
-                        kilometraje: Number(body.kilometraje),
-                        fecha: new Date(body.fecha),
-                        imagen: {
-                            url: imageUrl,
-                            public_id: imageId
+                        type: body.type || activity.type,
+                        description: body.description || activity.description,
+                        km: Number(body.km) || activity.km,
+                        date: new Date(body.date) || activity.date,
+                        image: {
+                            url: imageUrl || activity.image.url,
+                            public_id: imageId || activity.image.public_id
                         },
-                        proximaFecha: {
-                            tiene: body.tieneProximaFecha === "SI",
-                            fecha: new Date(body.proximaFecha)
+                        nextDate: {
+                            tiene: body.isNextDate === "SI",
+                            date: new Date(body.nextDate) || new Date()
                         },
-                        proximoKilometraje: {
-                            tiene: body.tieneProximoKilometraje === "SI",
-                            kilometraje: Number(body.proximoKilometraje)
+                        nextKm: {
+                            tiene: body.isNextKm === "SI",
+                            km: Number(body.nextKm) || 0
                         },
-                        activo: body.activo === "SI"
+                        active: body.activo === "SI"
                     }
                 }
             )
@@ -267,7 +271,7 @@ const updateActivityPremium = async (req, res) => {
 }
 
 const deleteActivity = async (req, res) => {
-    const {body} = req; //actividadID.
+    const {id} = req.params;
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -278,29 +282,29 @@ const deleteActivity = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        const activity = await Activities.findOne({_id: body.actividadID});
+        const activity = await Activities.findOne({_id: id});
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
-        const vehicle = await Vehicles.findOne({_id: activity.vehiculo});
+        const vehicle = await Vehicles.findOne({_id: activity.vehicle});
         if (!vehicle) {
             return res.status(403).send("Vehículo no encontrado en la base de datos.");
         }
         //Chequeao si tiene imagen.
-        if (activity.imagen.public_id !== "") {
+        if (activity.image.public_id !== "") {
             //Elimino la imagen de cloudinary.
-            await cloudinary.uploader.destroy(activity.imagen.public_id);
+            await cloudinary.uploader.destroy(activity.image.public_id);
         }
         //Elimino la actividad.
         await Activities.deleteOne({_id: activity._id});
         //Quito la actividad del vehiculo.
-        const vehicleActivities = [...vehicle.actividades];
+        const vehicleActivities = [...vehicle.activities];
         const activitiesFilter = vehicleActivities.filter((element) => element !== activity._id.toString());
         await Vehicles.updateOne({_id: vehicle._id},
             {
                 $set: {
-                    actividades: activitiesFilter,
-                    actualizado: new Date(Date.now())
+                    activities: activitiesFilter,
+                    updated: new Date(Date.now())
                 }
             }
         )
