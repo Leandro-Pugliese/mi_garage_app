@@ -92,7 +92,7 @@ const vehicleList = async (req, res) => {
 
 const updateVehicle = async (req, res) => {
     const {id} = req.params
-    const {body} = req; //type, brand, model, year, patente, fuel, gnc, seguro, use.
+    const {body} = req; //type, brand, model, year, patente, fuel, gnc, seguro, use, km
     try {
         const vehicle = await Vehicles.findOne({_id: id});
         if (!vehicle) {
@@ -110,7 +110,9 @@ const updateVehicle = async (req, res) => {
                     gnc: body.gnc || vehicle.gnc,
                     seguro: body.seguro || vehicle.seguro,
                     use: body.use || vehicle.use,
-                    updated: new Date(Date.now())
+                    km: body.km || vehicle.km,
+                    updated: new Date(Date.now()),
+                    ...(body.km && {updatedKm: new Date(Date.now())})
                 }
             }
         )
@@ -120,26 +122,4 @@ const updateVehicle = async (req, res) => {
     }
 }
 
-const updateVehicleKm = async (req, res) => {
-    const {id} = req.params
-    const {body} = req; //km
-    try {
-        const vehicle = await Vehicles.findOne({_id: id});
-        if (!vehicle) {
-            return res.status(403).send("Vehículo no encontrado en la base de datos.");
-        }
-        await Vehicles.updateOne({_id: vehicle._id},
-            {
-                $set: {
-                    km: body.kilometraje,
-                    updatedKm: new Date(Date.now())
-                }
-            }
-        )
-        return res.status(200).send("Kilometraje del vehículo modificado exitosamente.");
-    } catch (error) {
-        return res.status(500).send(error.message);
-    }
-}
-
-module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, updateVehicleKm}
+module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle}
