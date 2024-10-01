@@ -92,7 +92,7 @@ const vehicleList = async (req, res) => {
 
 const updateVehicle = async (req, res) => {
     const {id} = req.params
-    const {body} = req; //type, brand, model, year, patente, fuel, gnc, seguro, use, km
+    const {body} = req; //type, brand, model, year, patente, fuel, gnc, company, coverage, use, km
     try {
         const vehicle = await Vehicles.findOne({_id: id});
         if (!vehicle) {
@@ -108,7 +108,10 @@ const updateVehicle = async (req, res) => {
                     patente: body.patente || vehicle.patente,
                     fuel: body.fuel || vehicle.fuel,
                     gnc: body.gnc || vehicle.gnc,
-                    seguro: body.seguro || vehicle.seguro,
+                    seguro: {
+                        aseguradora: body.company || vehicle.seguro.aseguradora,
+                        cobertura: body.coverage || vehicle.seguro.cobertura
+                    },
                     use: body.use || vehicle.use,
                     km: body.km || vehicle.km,
                     updated: new Date(Date.now()),
