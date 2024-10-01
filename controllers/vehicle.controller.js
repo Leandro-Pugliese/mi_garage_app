@@ -1,7 +1,9 @@
 const express = require("express");
 const Users = require("../models/User");
 const Vehicles = require("../models/Vehicle");
+const Activities = require("../models/Activity");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 require("dotenv").config();
 
 const createVehicle = async (req, res) => {
@@ -125,4 +127,46 @@ const updateVehicle = async (req, res) => {
     }
 }
 
-module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle}
+const deleteVehicle = async (req, res) => {
+    const {id} = req.params //vehiculoID
+    const {body} = req; //Password
+    try {
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id});
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
+        const vehicle = await Vehicles.findOne({_id: id});
+        if (!vehicle) {
+            return res.status(403).send("Vehículo no encontrado en la base de datos.");
+        }
+        //Chequeo de contraseña
+        const isMatch = await bcrypt.compare(body.password, user.password);
+        if (!isMatch) {
+            return res.status(403).send("Contraseña incorrecta.");
+        }
+        //Elimino el vehiculo
+        await Vehicles.deleteOne({_id: vehicle._id});
+        //Si hay actividades que pertenecen al vehiculo, las elimino tambien
+        await Activities.deleteMany({vehicle: id});
+        //Hago update del usuario quitando el id del vehiculo
+        const userVehicles = [...user.vehicles];
+        const newVehiclesList = userVehicles.filter((vehicle) => vehicle !== id)
+        await Users.updateOne({_id: user._id},
+            {
+                $set: {
+                    vehicles: newVehiclesList
+                }
+            }
+        )
+        return res.status(200).send("Vehículo eliminado exitosamente");
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
+module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle}

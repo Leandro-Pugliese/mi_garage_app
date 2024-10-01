@@ -14,13 +14,13 @@ const checkKm = async (req, res) => {
             return
         }
         for (let i=0; i < users.length; i++) {
-            if (users[i].verificado === true) {
-                const userVehiclesList = users[i].vehiculos
+            if (users[i].verify === true) {
+                const userVehiclesList = users[i].vehicles
                 for (let x=0; x < userVehiclesList.length; x++) {
                     const vehicle = await Vehicles.findOne({_id: userVehiclesList[x]});
                     if (vehicle) {
                         //Chequeo cuando fue modificado el kilometraje de cada vehículo.
-                        const updateKmDate = new Date(vehicle.kilometrajeActualizado);
+                        const updateKmDate = new Date(vehicle.updatedKm);
                         const currentDate = new Date(Date.now());
                         // Calculo la diferencia en días.
                         const diffInDays = differenceInDays(currentDate, updateKmDate);
@@ -67,20 +67,20 @@ const checkPremium = async (req, res) => {
             return
         }
         for (let i=0; i < users.length; i++) {
-            if (users[i].premium === true && users[i].verificado === true) {
+            if (users[i].premium === true && users[i].verify === true) {
                 //Chequeo cuando fue modificado el kilometraje de cada vehículo.
-                const premiumExpiration = new Date(users[i].vencimientoPremium);
+                const premiumExpirationDate = new Date(users[i].premiumExpiration);
                 const currentDate = new Date(Date.now());
                 // Resto 7 días a la fecha de vencimiento.
-                const reminderDate = subDays(premiumExpiration, 7);
+                const reminderDate = subDays(premiumExpirationDate, 7);
                 // Chequeo si falta menos de una semana para el vencimiento y todavia no paso la fecha.
-                if (isAfter(currentDate, reminderDate) && isBefore(currentDate, premiumExpiration)) {
+                if (isAfter(currentDate, reminderDate) && isBefore(currentDate, premiumExpirationDate)) {
                     const { error } = await resend.emails.send({
                         from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
                         to: [users[i].email],
                         subject: 'Vencimiento membresía premium',
                         html: ` <strong>¡Hola, este correo es para recordarte que se aproxima el vencimiento de tu membresía premium!</strong>
-                                <br><strong>Fecha de vencimiento: ${users[i].vencimientoPremium.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y renovar tu membresía premium para seguir aprovenchando al máximo las funcionalidades de la app.</strong>
+                                <br><strong>Fecha de vencimiento: ${users[i].premiumExpiration.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y renovar tu membresía premium para seguir aprovenchando al máximo las funcionalidades de la app.</strong>
                                 <br><p>Si ya renovaste tu membresía premium ignora este email.</p>
                                 <br><p>Si no estas registrado en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
                     });
@@ -102,31 +102,31 @@ const checkActivity = async (req, res) => {
             return
         }
         for (let i=0; i < users.length; i++) {
-            if (users[i].verificado === true && users[i].premium === true) {
-                const userVehiclesList = users[i].vehiculos
+            if (users[i].verify === true && users[i].premium === true) {
+                const userVehiclesList = users[i].vehicles
                 for (let x=0; x < userVehiclesList.length; x++) {
                     const vehicle = await Vehicles.findOne({_id: userVehiclesList[x]});
                     if (vehicle) {
-                        const vehicleActivities = vehicle.actividades
+                        const vehicleActivities = vehicle.activities
                         if (vehicleActivities.length >= 1) {
                             for (let z=0; z < vehicleActivities.length; z++) {
                                 const activity = await Activities.findOne({_id: vehicleActivities[z]});
                                 if (activity) {
-                                    const avisosNumber =  activity.avisos.cantidad;
-                                    const avisoDate = new Date(activity.avisos.ultimoAviso);
+                                    const avisosNumber =  activity.notices.cantidad;
+                                    const avisoDate = new Date(activity.notices.lastNotice) || new Date(Date.now());
                                     const currentDate = new Date(Date.now()); 
                                     const DiffAviso = differenceInDays(avisoDate, currentDate);
                                     if ((avisosNumber <= 3) && (DiffAviso >= 2)) {
                                         //Cargo los datos del vehículo y la actividad.
                                         let vehicleKm = null; 
                                         let expiryKm = null;
-                                        if (activity.proximoKilometraje.tiene === true) {
-                                            vehicleKm = vehicle.kilometraje; 
-                                            expiryKm = activity.proximoKilometraje.kilometraje;
+                                        if (activity.nextKm.tiene === true) {
+                                            vehicleKm = vehicle.km; 
+                                            expiryKm = activity.nextKm.km;
                                         }
                                         let expiryDate = null; 
-                                        if (activity.proximaFecha.tiene === true) {
-                                            expiryDate = activity.proximaFecha.fecha
+                                        if (activity.nextDate.tiene === true) {
+                                            expiryDate = activity.nextDate.date
                                         }
                                         //Seteo el margen para kilómetros y fechas.
                                         const kmMargin = 1000;
@@ -144,15 +144,15 @@ const checkActivity = async (req, res) => {
                                         }
                                         let msjHtml = null;
                                         if (kmAlert && dateAlert) {
-                                            msjHtml = `<strong>La actividad: ${activity.tipo} (${activity.descripcion}) debe realizarse pronto. 
+                                            msjHtml = `<strong>La actividad: ${activity.type} (${activity.description}) debe realizarse pronto. 
                                                         Debes realizarla cuando el vehículo alcance los ${expiryKm}km o antes del ${expiryDate.toLocaleDateString()} (Tu vehíclo tiene ${vehicle.kilometraje}km).</strong>
                                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.</p>`;
                                         } else if (kmAlert) {
-                                            msjHtml = `<strong>La actividad: ${activity.tipo} (${activity.descripcion}) debe realizarse pronto. 
-                                                        Debes realizarla cuando el vehículo alcance los ${expiryKm}km (Tu vehíclo tiene ${vehicle.kilometraje}km).</strong>
+                                            msjHtml = `<strong>La actividad: ${activity.type} (${activity.description}) debe realizarse pronto. 
+                                                        Debes realizarla cuando el vehículo alcance los ${expiryKm}km (Tu vehíclo tiene ${vehicle.km}km).</strong>
                                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.<p/>`;
                                         } else if (dateAlert) {
-                                            msjHtml = `<strong>La actividad: ${activity.tipo} (${activity.descripcion}) debe realizarse pronto. 
+                                            msjHtml = `<strong>La actividad: ${activity.type} (${activity.description}) debe realizarse pronto. 
                                                         Debes realizarla antes del ${expiryDate.toLocaleDateString()}.</strong>
                                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.<p/>`;
                                         }
@@ -161,7 +161,7 @@ const checkActivity = async (req, res) => {
                                             const { error } = await resend.emails.send({
                                                 from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
                                                 to: [users[i].email],
-                                                subject: `Realizar ${activity.tipo} al vehículo`,
+                                                subject: `Realizar ${activity.type} al vehículo Dominio: ${vehicle.patente}`,
                                                 html: msjHtml,
                                             });
                                             if (error) {
@@ -171,9 +171,9 @@ const checkActivity = async (req, res) => {
                                                 await Activities.updateOne({_id: activity._id},
                                                     {
                                                         $set: {
-                                                            avisos: {
+                                                            notices: {
                                                                 cantidad: avisosNumber + 1,
-                                                                ultimoAviso: new Date(Date.now())
+                                                                lastNotice: new Date(Date.now())
                                                             }
                                                         }
                                                     }
@@ -195,19 +195,15 @@ const checkActivity = async (req, res) => {
 
 const removePremium = async (req, res) => {
     try {
-        const users = await Users.find();
+        const users = await Users.find({premium: true});
         if (users.length === 0) {
             return
         }
-        const premiumUsers = users.filter((user) => user.premium === true);
-        if (premiumUsers.length === 0) {
-            return
-        }
         const currentDate = new Date(Date.now());
-        for (let i=0; i < premiumUsers.length; i++) {
-            const premiumExpiryDate = new Date(premiumUsers[i].vencimientoPremium);
+        for (let i=0; i < users.length; i++) {
+            const premiumExpiryDate = new Date(users[i].premiumExpiration);
             if (isBefore(premiumExpiryDate, currentDate)) {
-                await Users.updateOne({_id: premiumUsers[i]._id},
+                await Users.updateOne({_id: users[i]._id},
                     {
                         $set: {
                             premium: false
@@ -216,10 +212,10 @@ const removePremium = async (req, res) => {
                 )
                 const { error } = await resend.emails.send({
                     from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
-                    to: [premiumUsers[i].email],
+                    to: [users[i].email],
                     subject: 'Membresía premium vencida',
                     html: ` <strong>¡Hola, este correo es para informarte que tu membresía premium venció!</strong>
-                            <br><strong>Fecha de vencimiento: ${users[i].vencimientoPremium.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y renovar tu membresía premium para seguir aprovenchando al máximo las funcionalidades de la app.</strong>
+                            <br><strong>Fecha de vencimiento: ${users[i].premiumExpiration.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y renovar tu membresía premium para seguir aprovenchando al máximo las funcionalidades de la app.</strong>
                             <br><p>Si ya renovaste tu membresía premium o no te interesa tener una ignora este email.</p>
                             <br><p>Si no estas registrado en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
                 });
