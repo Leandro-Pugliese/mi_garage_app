@@ -38,11 +38,11 @@ const createActivity = async (req, res) => {
             },
             nextDate: {
                 tiene: body.isNextDate === "SI",
-                date: new Date(body.proximaFecha)
+                date: new Date(body.nextDate) || new Date(Date.now())
             },
             nextKm: {
                 tiene: body.isNextKm === "SI",
-                km: Number(body.nextKm)
+                km: Number(body.nextKm) || 0
             },
             active: true,
             notices: {
@@ -65,6 +65,20 @@ const createActivity = async (req, res) => {
     } catch (error) {
         return res.status(500).send(error.message);
     }
+}
+
+const activitiesList = async (req, res) => {
+    const {id} = req.params; //vehicleId
+    try {
+        let activities = await Activities.find({vehicle: id});
+        return res.status(200).send(activities);
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
+const activityData = async (req, res) => {
+
 }
 
 // Función para subir a Cloudinary desde un buffer.
@@ -314,4 +328,4 @@ const deleteActivity = async (req, res) => {
     }
 }
 
-module.exports = {createActivity, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity}
+module.exports = {createActivity, activitiesList, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity}
