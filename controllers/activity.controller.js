@@ -127,19 +127,19 @@ const createActivityPremium = async (req, res) => {
             user: user._id.toString(),
             vehicle: vehicle._id.toString(),
             type: body.type,
-            description: new Date(body.description),
+            description: body.description,
             km: Number(body.km),
-            date: new Date(body.date),
+            date: new Date(body.date) || new Date(Date.now()),
             image: {
                 url: imageUrl,
                 public_id: imageId
             },
             nextDate: {
-                tiene: body.isNextDate,
+                tiene: body.isNextDate === "true", //Esta info viene en formData (string)
                 date: new Date(body.nextDate) || new Date(Date.now())
             },
             nextKm: {
-                tiene: body.isNextKm,
+                tiene: body.isNextKm === "true",
                 km: Number(body.nextKm) || 0
             },
             active: true,
@@ -188,14 +188,14 @@ const updateActivity = async (req, res) => { //Ruta solo para actividades sin im
                         public_id: ""
                     },
                     nextDate: {
-                        tiene: body.isNextDate === "SI",
+                        tiene: body.isNextDate,
                         fecha: new Date(body.nextDate) || new Date()
                     },
                     nextKm: {
-                        tiene: body.isNextKm === "SI",
+                        tiene: body.isNextKm,
                         kilometraje: Number(body.nextKm) || 0
                     },
-                    active: body.active === "SI"
+                    active: body.active
                 }
             }
         )
@@ -234,14 +234,14 @@ const updateActivityPremium = async (req, res) => {
                             public_id: imageId || activity.image.public_id
                         },
                         nextDate: {
-                            tiene: body.isNextDate === "SI",
+                            tiene: body.isNextDate,
                             date: new Date(body.nextDate) || new Date()
                         },
                         nextKm: {
-                            tiene: body.isNextKm === "SI",
+                            tiene: body.isNextKm,
                             km: Number(body.nextKm) || 0
                         },
-                        active: body.activo === "SI"
+                        active: body.active
                     }
                 }
             )
