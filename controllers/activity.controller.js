@@ -37,11 +37,11 @@ const createActivity = async (req, res) => {
                 public_id: ""
             },
             nextDate: {
-                tiene: body.isNextDate === "SI",
+                tiene: body.isNextDate,
                 date: new Date(body.nextDate) || new Date(Date.now())
             },
             nextKm: {
-                tiene: body.isNextKm === "SI",
+                tiene: body.isNextKm,
                 km: Number(body.nextKm) || 0
             },
             active: true,
@@ -126,21 +126,21 @@ const createActivityPremium = async (req, res) => {
         const activity = await Activities.create({
             user: user._id.toString(),
             vehicle: vehicle._id.toString(),
-            type: body.tipo,
-            description: new Date(body.descripcion),
-            km: Number(body.kilometraje),
-            date: body.fecha,
+            type: body.type,
+            description: new Date(body.description),
+            km: Number(body.km),
+            date: new Date(body.date),
             image: {
                 url: imageUrl,
                 public_id: imageId
             },
             nextDate: {
-                tiene: body.tieneProximaFecha === "SI",
-                fecha: new Date(body.proximaFecha)
+                tiene: body.isNextDate,
+                date: new Date(body.nextDate) || new Date(Date.now())
             },
             nextKm: {
-                tiene: body.tieneProximoKilometraje === "SI",
-                kilometraje: Number(body.proximoKilometraje)
+                tiene: body.isNextKm,
+                km: Number(body.nextKm) || 0
             },
             active: true,
             notices: {

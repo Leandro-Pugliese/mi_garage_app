@@ -21,7 +21,7 @@ const activitySchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    DataTransferItem: {
+    date: {
         type: Date, 
         required: true
     },
