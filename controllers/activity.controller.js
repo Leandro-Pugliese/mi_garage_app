@@ -3,6 +3,7 @@ const Users = require("../models/User");
 const Vehicles = require("../models/Vehicle");
 const Activities = require("../models/Activity");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 require("dotenv").config();
 const cloudinary = require('../assets/cloudinary');
 const streamifier = require('streamifier');
@@ -78,7 +79,16 @@ const activitiesList = async (req, res) => {
 }
 
 const activityData = async (req, res) => {
-
+    const {id} = req.params //activityID
+    try {
+        const activity = await Activities.findOne({_id: id});
+        if (!activity) {
+            return res.status(403).send("Actividad no encontrada en la base de datos.");
+        }
+        return res.status(200).send(activity);
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
 }
 
 // Función para subir a Cloudinary desde un buffer.
@@ -165,41 +175,67 @@ const createActivityPremium = async (req, res) => {
     }
 }
 
-const updateActivity = async (req, res) => { //Ruta solo para actividades sin imagen.
+const updateActivity = async (req, res) => { //Ruta solo para usuarios no premium.
     const {id} = req.params;
-    const {body} = req; //type, description, km, date, nextDate, nextkm, active.
+    const {body} = req; //type, description, km, date, isNextDate, nextDate, isNextkm, nextkm, active, deleteImage.
     try {
         const activity = await Activities.findOne({_id: id});
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
-        if (activity.image.public_id !== "") {
-            return res.status(403).send("Esta actividad tiene una imagen asociada, tienes que usar otra ruta para modificarla.");
-        }
-        await Activities.updateOne({_id: activity._id},
-            {
-                $set: {
-                    type: body.type || activity.type,
-                    description: body.description || activity.description,
-                    km: body.km || activity.km,
-                    date: new Date(body.date) || activity.date,
-                    image: {
-                        url: "",
-                        public_id: ""
-                    },
-                    nextDate: {
-                        tiene: body.isNextDate,
-                        fecha: new Date(body.nextDate) || new Date()
-                    },
-                    nextKm: {
-                        tiene: body.isNextKm,
-                        kilometraje: Number(body.nextKm) || 0
-                    },
-                    active: body.active
+        //No se puede modificar la imagen si no sos premium(si eras, cargaste una foto y no sos mas premium, solo podes eliminar la foto)
+        if (body.deleteImage === true) {
+            await Activities.updateOne({_id: activity._id},
+                {
+                    $set: {
+                        type: body.type || activity.type,
+                        description: body.description || activity.description,
+                        km: Number(body.km) || activity.km,
+                        date: new Date(body.date) || activity.date,
+                        image: { 
+                            url: "",
+                            public_id: ""
+                        },
+                        nextDate: {
+                            tiene: body.isNextDate || activity.nextDate.tiene,
+                            date: new Date(body.nextDate) || activity.nextDate.date
+                        },
+                        nextKm: {
+                            tiene: body.isNextKm || activity.nextKm.tiene,
+                            km: Number(body.nextKm) || activity.nextKm.km
+                        },
+                        active: body.active || activity.active
+                    }
                 }
+            )
+            if (activity.image.public_id !== "") {
+                await cloudinary.uploader.destroy(activity.image.public_id);
             }
-        )
-        return res.status(200).send("Actividad modificada exitosamente.");
+            return res.status(200).send("Actividad modificada exitosamente.");
+        } else if (body.deleteImage === false) {
+            await Activities.updateOne({_id: activity._id},
+                {
+                    $set: {
+                        type: body.type || activity.type,
+                        description: body.description || activity.description,
+                        km: Number(body.km) || activity.km,
+                        date: new Date(body.date) || activity.date,
+                        nextDate: {
+                            tiene: body.isNextDate || activity.nextDate.tiene,
+                            date: new Date(body.nextDate) || activity.nextDate.date
+                        },
+                        nextKm: {
+                            tiene: body.isNextKm || activity.nextKm.tiene ,
+                            km: Number(body.nextKm) || activity.nextKm.km 
+                        },
+                        active: body.active || activity.active
+                    }
+                }
+            )
+            return res.status(200).send("Actividad modificada exitosamente.");
+        } else {
+            return res.status(403).send("Borrado de imagen no definido.");
+        }
     } catch (error) {
         return res.status(500).send(error.message);
     }
@@ -207,21 +243,34 @@ const updateActivity = async (req, res) => { //Ruta solo para actividades sin im
 
 const updateActivityPremium = async (req, res) => {
     const {id} = req.params;
-    const {body} = req; //type, description, km, date, nextDate, nextkm, active.
+    const {body} = req; //type, description, km, date, isNextDate, nextDate, isNextKm, nextkm, active, deleteImage.
     try {
         const activity = await Activities.findOne({_id: id});
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
-        // Si no se carga imagen lo dejo vacio.
-        let imageUrl = null;
-        let imageId = null;
-        // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary.
-        if (req.file !== undefined) {
-            const image = req.file.buffer;
-            const uploadedImage = await uploadToCloudinary(image);
-            imageUrl = uploadedImage.secure_url; // URL de la imagen.
-            imageId = uploadedImage.public_id; // ID de la imagen.
+        //Verifico si hay nextDate y nextKm (la info viene en string, es formData)
+        //Pero tengo que saber si el usuario lo cambio o lo dejo igual
+        let hasNextDate = null;
+        let hasNextKm = null;
+        if (body.isNextDate === "true" || body.isNextDate === "false") {
+            hasNextDate = body.isNextDate === "true"; //Lo convierto en boolean
+        }
+        if (body.isNextKm === "true" || body.isNextKm === "false") {
+            hasNextKm = body.isNextKm === "true";
+        }
+        //Chequeo si va a borrar la imagen o no
+        if (deleteImage === "false") {
+            // Si no se carga imagen lo dejo vacio.
+            let imageUrl = null;
+            let imageId = null;
+            // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary
+            if (req.file !== undefined) {
+                const image = req.file.buffer;
+                const uploadedImage = await uploadToCloudinary(image);
+                imageUrl = uploadedImage.secure_url; // URL de la imagen
+                imageId = uploadedImage.public_id; // ID de la imagen
+            }
             await Activities.updateOne({_id: activity._id},
                 {
                     $set: {
@@ -234,51 +283,54 @@ const updateActivityPremium = async (req, res) => {
                             public_id: imageId || activity.image.public_id
                         },
                         nextDate: {
-                            tiene: body.isNextDate,
-                            date: new Date(body.nextDate) || new Date()
+                            tiene: hasNextDate === true || activity.nextDate.tiene,
+                            date: new Date(body.nextDate) || activity.nextDate.date
                         },
                         nextKm: {
-                            tiene: body.isNextKm,
-                            km: Number(body.nextKm) || 0
+                            tiene: hasNextKm === true || activity.nextKm.tiene,
+                            km: Number(body.nextKm) || activity.nextKm.km
                         },
-                        active: body.active
+                        active: body.active || activity.active
                     }
                 }
             )
             // Si tiene imagen y la modifica tengo que borrar la vieja de cloudinary.
-            if (activity.imagen.public_id !== "") {
-                await cloudinary.uploader.destroy(activity.imagen.public_id);
+            if ((activity.image.public_id !== "") && (req.file !== undefined)) {
+                await cloudinary.uploader.destroy(activity.image.public_id);
             }
-        } else {
-            // Si tiene imagen y la quita tengo que borrar la vieja de cloudinary.
-            if (activity.imagen.public_id !== "") {
-                await cloudinary.uploader.destroy(activity.imagen.public_id);
-            }
+            return res.status(200).send("Actividad modificada exitosamente.");
+        } else if (deleteImage === "true") {
             await Activities.updateOne({_id: activity._id},
                 {
                     $set: {
-                        tipo: body.tipo,
-                        descripcion: body.descripcion,
-                        kilometraje: Number(body.kilometraje),
-                        fecha: new Date(body.fecha),
-                        imagen: {
-                            url: imageUrl,
-                            public_id: imageId
+                        type: body.type || activity.type,
+                        description: body.description || activity.description,
+                        km: Number(body.km) || activity.km,
+                        date: new Date(body.date) || activity.date,
+                        image: {
+                            url: "",
+                            public_id: ""
                         },
-                        proximaFecha: {
-                            tiene: body.tieneProximaFecha === "SI",
-                            fecha: new Date(body.proximaFecha)
+                        nextDate: {
+                            tiene: hasNextDate === true || activity.nextDate.tiene,
+                            date: new Date(body.nextDate) || activity.nextDate.date
                         },
-                        proximoKilometraje: {
-                            tiene: body.tieneProximoKilometraje === "SI",
-                            kilometraje: Number(body.proximoKilometraje)
+                        nextKm: {
+                            tiene: hasNextKm === true || activity.nextKm.tiene,
+                            km: Number(body.nextKm) || activity.nextKm.km
                         },
-                        activo: body.activo === "SI"
+                        active: body.active || activity.active
                     }
                 }
             )
+            // Borro la imagen de cloudinary.
+            if (activity.image.public_id !== "") {
+                await cloudinary.uploader.destroy(activity.image.public_id);
+            }
+            return res.status(200).send("Actividad modificada exitosamente.");
+        } else {
+            return res.status(403).send("Borrado de imagen no definido.");
         }
-        return res.status(200).send("Actividad modificada exitosamente.");
     } catch (error) {
         return res.status(500).send(error.message);
     }
@@ -286,6 +338,7 @@ const updateActivityPremium = async (req, res) => {
 
 const deleteActivity = async (req, res) => {
     const {id} = req.params;
+    const {body} = req;
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -295,6 +348,11 @@ const deleteActivity = async (req, res) => {
         const user = await Users.findOne({_id: _id});
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
+        //Chequeo de contraseña
+        const isMatch = await bcrypt.compare(body.password, user.password);
+        if (!isMatch) {
+            return res.status(403).send("Contraseña incorrecta.");
         }
         const activity = await Activities.findOne({_id: id});
         if (!activity) {
@@ -328,4 +386,4 @@ const deleteActivity = async (req, res) => {
     }
 }
 
-module.exports = {createActivity, activitiesList, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity}
+module.exports = {createActivity, activitiesList, activityData, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity}

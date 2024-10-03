@@ -4,7 +4,7 @@ const {isAuthenticated} = require("../authentication/authentication");
 const {isPremium} = require("../authentication/premiumVerification");
 const {createUser, loginUser, userData, updateUser, updatePassword, updateCategories, sendEmailValidation, emailValidation, forgotPassword, resetPassword} = require("../controllers/user.controller");
 const {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle} = require("../controllers/vehicle.controller");
-const {createActivity, activitiesList, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
+const {createActivity, activitiesList, activityData, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
 const {createPreference, paymentNotification, paymentRedirect} = require("../assets/mercadoPago");
 
@@ -30,6 +30,7 @@ router.delete("/vehicle/delete/:id", isAuthenticated, deleteVehicle);
 // Activity routes.
 router.post("/activity/create/:id", isAuthenticated, createActivity);
 router.get("/activity/list/:id", isAuthenticated, activitiesList);
+router.get("/activity/data/:id", isAuthenticated, activityData);
 router.post("/activity/create-premium/:id", isPremium, uploadImagen, createActivityPremium);
 router.put("/activity/update/:id", isAuthenticated, updateActivity);
 router.put("/activity/update-premium/:id", isPremium, uploadImagen, updateActivityPremium);
