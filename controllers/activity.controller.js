@@ -183,6 +183,14 @@ const updateActivity = async (req, res) => { //Ruta solo para usuarios no premiu
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
+        let isDate = null;
+        if (body.date !== null) {
+            isDate = new Date(body.date)
+        }
+        let nextDateChanged = null;
+        if (body.nextDate !== null) {
+            nextDateChanged = new Date(body.nextDate)
+        }
         //No se puede modificar la imagen si no sos premium(si eras, cargaste una foto y no sos mas premium, solo podes eliminar la foto)
         if (body.deleteImage === true) {
             await Activities.updateOne({_id: activity._id},
@@ -191,20 +199,20 @@ const updateActivity = async (req, res) => { //Ruta solo para usuarios no premiu
                         type: body.type || activity.type,
                         description: body.description || activity.description,
                         km: Number(body.km) || activity.km,
-                        date: new Date(body.date) || activity.date,
+                        date: isDate || activity.date,
                         image: { 
                             url: "",
                             public_id: ""
                         },
                         nextDate: {
                             tiene: body.isNextDate || activity.nextDate.tiene,
-                            date: new Date(body.nextDate) || activity.nextDate.date
+                            date: nextDateChanged || activity.nextDate.date
                         },
                         nextKm: {
                             tiene: body.isNextKm || activity.nextKm.tiene,
                             km: Number(body.nextKm) || activity.nextKm.km
                         },
-                        active: body.active || activity.active
+                        active: body.active
                     }
                 }
             )
@@ -219,16 +227,16 @@ const updateActivity = async (req, res) => { //Ruta solo para usuarios no premiu
                         type: body.type || activity.type,
                         description: body.description || activity.description,
                         km: Number(body.km) || activity.km,
-                        date: new Date(body.date) || activity.date,
+                        date: isDate || activity.date,
                         nextDate: {
                             tiene: body.isNextDate || activity.nextDate.tiene,
-                            date: new Date(body.nextDate) || activity.nextDate.date
+                            date: nextDateChanged || activity.nextDate.date
                         },
                         nextKm: {
                             tiene: body.isNextKm || activity.nextKm.tiene ,
                             km: Number(body.nextKm) || activity.nextKm.km 
                         },
-                        active: body.active || activity.active
+                        active: body.active
                     }
                 }
             )
@@ -249,18 +257,33 @@ const updateActivityPremium = async (req, res) => {
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
         }
-        //Verifico si hay nextDate y nextKm (la info viene en string, es formData)
-        //Pero tengo que saber si el usuario lo cambio o lo dejo igual
+        //Transformo la info viene en string, porque es formData
         let hasNextDate = null;
-        let hasNextKm = null;
         if (body.isNextDate === "true" || body.isNextDate === "false") {
             hasNextDate = body.isNextDate === "true"; //Lo convierto en boolean
         }
+        let nextDateChanged = null;
+        if (body.nextDate !== "null") {
+            nextDateChanged = new Date(body.nextDate);
+        }
+        let hasNextKm = null;
         if (body.isNextKm === "true" || body.isNextKm === "false") {
             hasNextKm = body.isNextKm === "true";
         }
+        let isType = null;
+        if (body.type !== "undefined") {
+            isType = body.type
+        }
+        let isDate = null;
+        if (body.date !== "null") {
+            isDate = new Date(body.date)
+        }
+        let isDescription = null;
+        if (body.description !== "null") {
+            isDescription = body.description
+        }
         //Chequeo si va a borrar la imagen o no
-        if (deleteImage === "false") {
+        if (body.deleteImage === "false") {
             // Si no se carga imagen lo dejo vacio.
             let imageUrl = null;
             let imageId = null;
@@ -274,23 +297,23 @@ const updateActivityPremium = async (req, res) => {
             await Activities.updateOne({_id: activity._id},
                 {
                     $set: {
-                        type: body.type || activity.type,
-                        description: body.description || activity.description,
+                        type: isType || activity.type,
+                        description: isDescription || activity.description,
                         km: Number(body.km) || activity.km,
-                        date: new Date(body.date) || activity.date,
+                        date: isDate || activity.date,
                         image: {
                             url: imageUrl || activity.image.url,
                             public_id: imageId || activity.image.public_id
                         },
                         nextDate: {
                             tiene: hasNextDate === true || activity.nextDate.tiene,
-                            date: new Date(body.nextDate) || activity.nextDate.date
+                            date: nextDateChanged || activity.nextDate.date
                         },
                         nextKm: {
                             tiene: hasNextKm === true || activity.nextKm.tiene,
                             km: Number(body.nextKm) || activity.nextKm.km
                         },
-                        active: body.active || activity.active
+                        active: body.active === "true"
                     }
                 }
             )
@@ -299,27 +322,27 @@ const updateActivityPremium = async (req, res) => {
                 await cloudinary.uploader.destroy(activity.image.public_id);
             }
             return res.status(200).send("Actividad modificada exitosamente.");
-        } else if (deleteImage === "true") {
+        } else if (body.deleteImage === "true") {
             await Activities.updateOne({_id: activity._id},
                 {
                     $set: {
-                        type: body.type || activity.type,
-                        description: body.description || activity.description,
+                        type: isType || activity.type,
+                        description: isDescription || activity.description,
                         km: Number(body.km) || activity.km,
-                        date: new Date(body.date) || activity.date,
+                        date: isDate || activity.date,
                         image: {
                             url: "",
                             public_id: ""
                         },
                         nextDate: {
                             tiene: hasNextDate === true || activity.nextDate.tiene,
-                            date: new Date(body.nextDate) || activity.nextDate.date
+                            date: nextDateChanged || activity.nextDate.date
                         },
                         nextKm: {
                             tiene: hasNextKm === true || activity.nextKm.tiene,
                             km: Number(body.nextKm) || activity.nextKm.km
                         },
-                        active: body.active || activity.active
+                        active: body.active === "true"
                     }
                 }
             )
