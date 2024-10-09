@@ -14,7 +14,7 @@ router.post("/user/login", loginUser);
 router.get("/user/data", isAuthenticated, userData);
 router.put("/user/update-user", isAuthenticated, updateUser);
 router.put("/user/update-password", isAuthenticated, updatePassword);
-router.put("/user/update-categorias", isAuthenticated, updateCategories);
+router.put("/user/update-categories", isPremium, updateCategories);
 router.get("/user/send-validation", isAuthenticated, sendEmailValidation);
 router.put("/user/validation/:id/:token", emailValidation);
 router.post("/user/forgot-password", forgotPassword);

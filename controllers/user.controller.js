@@ -157,6 +157,7 @@ const updateCategories = async (req, res) => {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
         let categorias = [...user.categories];
+        let msj = '';
         if (body.operation === "ADD") {
              // Chequeo que no este repetida la categoría.
              if (categorias.includes(body.category) === true) {
@@ -164,14 +165,18 @@ const updateCategories = async (req, res) => {
             }
             // Agrego la categoría ingresada.
             categorias.push(body.category);
+            msj = "Categoría agregada exitosamente."
         } else if (body.operation === "REMOVE") {
             // Tengo que chequear si esa categoría no se utiliza en alguna actividad antes de borrarla.
-            const activities = await Activities.find();
-            const userActivities = activities.filter((activity) => activity.user === user._id);
+            const activities = await Activities.find({user: user._id});
             // Filtro las actividades del usuario con la categoría que quiere eliminar.
-            const categoriaUtilizada = userActivities.filter((activity) => activity.type === body.category);
+            const categoriaUtilizada = activities.filter((activity) => activity.type === body.category);
             if (categoriaUtilizada.length >= 1) { // Si hay al menos una actividad con esa categoría no la podes borrar.
                 return res.status(403).send("No es posible eliminar esta categoría porque hay actividades en la base de datos que pertenecen a la misma, modifica la categoría de esas actividades para poder eliminarla.");
+            }
+            //Chequeo si solo queda una categoria, obligo al usuario a crear otra antes de eliminarla, para que no quede vacia la lista.
+            if (categorias.length === 1) {
+                return res.status(403).send("Debes tener al menos una categoría para poder cargar actividades, para eliminar esta última debes crear otra primero.")
             }
             // En caso de que se pueda borrar, la quitamos de la lista.
             for (let indice in categorias){
@@ -180,18 +185,19 @@ const updateCategories = async (req, res) => {
                     categorias.splice(indice, 1);
                 }
             }
-            // Hago el update del usuario con las categorias modificadas.
-            await Users.updateOne({_id: user._id},
-                {
-                    $set: {
-                        categories: categorias
-                    }
-                }
-            )
-            return res.status(200).send("Categorías modificadas exitosamente.");
+            msj = 'Categoría eliminada exitosamente.'
         } else {
             return res.status(403).send("Tipo de operación no definido.");
         }
+        // Hago el update del usuario con las categorias modificadas.
+        await Users.updateOne({_id: user._id},
+            {
+                $set: {
+                    categories: categorias
+                }
+            }
+        )
+        return res.status(200).send(msj);
     } catch (error) {
         return res.status(500).send(error.message);
     }
