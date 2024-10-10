@@ -11,7 +11,7 @@ const resend = new Resend(process.env.RESEND);
 const signToken = (_id, email) => jwt.sign({_id, email}, process.env.JWT_CODE);
 
 const createUser = async (req, res) => {
-    const {body} = req; //email, pais, provincia, localidad, password
+    const {body} = req; //email, country, province, phone, password
     try {
         const emailUser = body.email.toLowerCase();
         const isUser = await Users.findOne({email: emailUser});
@@ -22,16 +22,16 @@ const createUser = async (req, res) => {
         const hashed = await bcrypt.hash(body.password, salt);
         const user = await Users.create({
             email: emailUser,
-            verificado: false,
+            verify: false,
             premium: false,
-            vencimientoPremium: new Date(Date.now()),
-            vehiculos: [],
-            categorias: ["MANTENIMIENTO", "SEGURO", "VERIFCACIÓN TÉCNICA", "PATENTE", "GNC", "OTROS"],
-            ingresos: 0,
-            ultimaConexion: new Date(Date.now()),
-            pais: body.pais,
-            provincia: body.provincia,
-            localidad: body.localidad,
+            premiumExpiration: new Date(Date.now()),
+            vehicles: [],
+            categories: ["MANTENIMIENTO", "SEGURO", "VERIFCACIÓN TÉCNICA", "PATENTE", "GNC", "OTROS"],
+            entries: 0,
+            lastConection: new Date(Date.now()),
+            country: body.country,
+            province: body.province,
+            phone: body.phone || 0,
             password: hashed, salt
         })
         const token = signToken(user._id, user.email);
@@ -55,8 +55,8 @@ const loginUser = async (req, res) => {
             await Users.updateOne({ _id: user._id },
                 {
                     $set: {
-                        ingresos: user.ingresos + 1,
-                        ultimaConexion: new Date(Date.now())
+                        entries: user.entries + 1,
+                        lastConection: new Date(Date.now())
                     }
                 }
             );
@@ -87,7 +87,7 @@ const userData = async (req, res) => {
 }
 
 const updateUser = async (req, res) => {
-    const {body} = req; //pais, provincia, localidad.
+    const {body} = req; //country, province, phone.
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -101,9 +101,9 @@ const updateUser = async (req, res) => {
         await Users.updateOne({email: email},
             {
                 $set: {
-                    pais: body.pais,
-                    provincia: body.provincia,
-                    localidad: body.localidad
+                    country: body.country || user.country,
+                    province: body.province || user.province,
+                    phone: body.phone || user.phone
                 }
             }
         )
@@ -114,7 +114,7 @@ const updateUser = async (req, res) => {
 }
 
 const updatePassword = async (req, res) => {
-    const {body} = req; //PasswordActual, passwordNueva
+    const {body} = req; //oldPassword, newPassword
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -125,12 +125,12 @@ const updatePassword = async (req, res) => {
         if (!user) {
             return res.status(403).send("Credenciales inválidas.");
         }
-        const isMatch = await bcrypt.compare(body.passwordActual, user.password);
+        const isMatch = await bcrypt.compare(body.oldPassword, user.password);
         if (!isMatch) {
             return res.status(403).send("Contraseña actual inválida.");
         }
         const salt = await bcrypt.genSalt();
-        const hashed = await bcrypt.hash(body.passwordNueva, salt);
+        const hashed = await bcrypt.hash(body.newPassword, salt);
         await Users.updateOne({email: email},
             {
                 $set: {
@@ -144,8 +144,8 @@ const updatePassword = async (req, res) => {
     }
 }
 
-const updateCategorias = async (req, res) => {
-    const {body} = req; //operacion("ADD"/"REMOVE"), categoria.
+const updateCategories = async (req, res) => {
+    const {body} = req; //operation("ADD"/"REMOVE"), category.
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -156,42 +156,48 @@ const updateCategorias = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        let categorias = [...user.categorias];
-        if (body.operacion === "ADD") {
+        let categorias = [...user.categories];
+        let msj = '';
+        if (body.operation === "ADD") {
              // Chequeo que no este repetida la categoría.
-             if (categorias.includes(body.categoria) === true) {
+             if (categorias.includes(body.category) === true) {
                 return res.status(403).send("La categoría ya esta registrada.");
             }
             // Agrego la categoría ingresada.
-            categorias.push(body.categoria);
-        } else if (body.operacion === "REMOVE") {
+            categorias.push(body.category);
+            msj = "Categoría agregada exitosamente."
+        } else if (body.operation === "REMOVE") {
             // Tengo que chequear si esa categoría no se utiliza en alguna actividad antes de borrarla.
-            const activities = await Activities.find();
-            const userActivities = activities.filter((activity) => activity.usuario === user._id);
+            const activities = await Activities.find({user: user._id});
             // Filtro las actividades del usuario con la categoría que quiere eliminar.
-            const categoriaUtilizada = userActivities.filter((activity) => activity.tipo === body.categoria);
+            const categoriaUtilizada = activities.filter((activity) => activity.type === body.category);
             if (categoriaUtilizada.length >= 1) { // Si hay al menos una actividad con esa categoría no la podes borrar.
                 return res.status(403).send("No es posible eliminar esta categoría porque hay actividades en la base de datos que pertenecen a la misma, modifica la categoría de esas actividades para poder eliminarla.");
+            }
+            //Chequeo si solo queda una categoria, obligo al usuario a crear otra antes de eliminarla, para que no quede vacia la lista.
+            if (categorias.length === 1) {
+                return res.status(403).send("Debes tener al menos una categoría para poder cargar actividades, para eliminar esta última debes crear otra primero.")
             }
             // En caso de que se pueda borrar, la quitamos de la lista.
             for (let indice in categorias){
                 let categoriaOriginal = categorias[indice];
-                if (categoriaOriginal === body.categoria) {
+                if (categoriaOriginal === body.category) {
                     categorias.splice(indice, 1);
                 }
             }
-            // Hago el update del usuario con las categorias modificadas.
-            await Users.updateOne({_id: user._id},
-                {
-                    $set: {
-                        categorias: categorias
-                    }
-                }
-            )
-            return res.status(200).send("Categorías modificadas exitosamente.");
+            msj = 'Categoría eliminada exitosamente.'
         } else {
             return res.status(403).send("Tipo de operación no definido.");
         }
+        // Hago el update del usuario con las categorias modificadas.
+        await Users.updateOne({_id: user._id},
+            {
+                $set: {
+                    categories: categorias
+                }
+            }
+        )
+        return res.status(200).send(msj);
     } catch (error) {
         return res.status(500).send(error.message);
     }
@@ -208,7 +214,7 @@ const sendEmailValidation = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        if (user.verificado === true) {
+        if (user.verify === true) {
             return res.status(403).send("Tu email ya fue verificado.");
         }
         const payload = {
@@ -219,12 +225,14 @@ const sendEmailValidation = async (req, res) => {
         const { error } = await resend.emails.send({
             from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
             to: [user.email],
-            subject: 'Verificación de Correo Mi Garage',
-            html: ` <strong>Ingresa en el siguiente link para verificar tu correo: <a href="http://localhost:3000/validation/${link}">Click Aqui</a></strong>
+            subject: 'Verificación de Correo',
+            html: ` <strong>Ingresa en el siguiente link para verificar tu correo: <a href="http://localhost:3000/user/${link}">Click Aqui</a></strong>
+                    <br><p>Este es un email automático, no debes responderlo.</p>       
                     <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
         });
         if (error) {
-            return res.status(403).send(error);
+            console.log(error)
+            return res.status(403).send("Error al enviar el email.");
         }
         return res.status(200).send("Enviamos un email para verificar tu correo.");
     } catch (error) {
@@ -233,7 +241,7 @@ const sendEmailValidation = async (req, res) => {
 }
 
 const emailValidation= async (req, res) => {
-    const {id, token} = req.params
+    const {id, token} = req.params;
     try {
         jwt.verify(token, process.env.JWT_CODE);
         const user = await Users.findOne({_id: id})
@@ -243,7 +251,7 @@ const emailValidation= async (req, res) => {
         await Users.updateOne({_id: id},
             {
                 $set: {
-                   verificado: true
+                   verify: true
                 }
             }
         )
@@ -270,11 +278,11 @@ const forgotPassword = async (req, res) => {
             from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
             to: [emailUser],
             subject: 'Restablecer contraseña Mi Garage',
-            html: ` <strong>Ingresa en el siguiente link para restablecer tu contraseña: <a href="http://localhost:3000/recuperar-password/${link}">Click Aqui</a></strong>
+            html: ` <strong>Ingresa en el siguiente link para restablecer tu contraseña: <a href="http://localhost:3000/user/forgotPassword/${link}">Click Aqui</a></strong>
                     <br><p>¡Si no pediste el restablecer la contraseña ignora este email y avisa al staff de inmediato!</p>`,
         });
         if (error) {
-            return res.status(403).send(error);
+            return res.status(403).send("Error al enviar el email.");
         }
         return res.status(200).send("Enviamos un link a tu email para que puedas recuperar la contraseña, recordá verificar la casilla de spam si no encuentras el email.")
     } catch (error) {
@@ -283,7 +291,7 @@ const forgotPassword = async (req, res) => {
 }
 
 const resetPassword = async (req, res) => {
-    const {body} = req; //passwordNueva
+    const {body} = req; //newPassword
     const {id, token} = req.params
     try {
         const user = await Users.findOne({_id: id});
@@ -292,7 +300,7 @@ const resetPassword = async (req, res) => {
         }
         jwt.verify(token, process.env.JWT_CODE);
         const salt = await bcrypt.genSalt();
-        const hashed = await bcrypt.hash(body.passwordNueva, salt);
+        const hashed = await bcrypt.hash(body.newPassword, salt);
         await Users.updateOne({_id: id},
             {
                 $set: {
@@ -306,5 +314,5 @@ const resetPassword = async (req, res) => {
     }
 }
 
-module.exports = { createUser, loginUser, userData, updateUser, updatePassword, updateCategorias, sendEmailValidation, 
+module.exports = { createUser, loginUser, userData, updateUser, updatePassword, updateCategories, sendEmailValidation, 
                    emailValidation, forgotPassword, resetPassword }

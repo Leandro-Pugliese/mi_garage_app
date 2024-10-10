@@ -1,19 +1,19 @@
 const mongoose = require("mongoose");
 
 const vehicleSchema = new mongoose.Schema({
-    usuario: {
+    user: {
         type: String,
         required: true
     },
-    tipo: {
+    type: {
         type: String,
         required: true
     },
-    marca: {
+    brand: {
         type: String,
         required: true
     },
-    modelo: {
+    model: {
         type: String,
         required: true
     },
@@ -25,7 +25,7 @@ const vehicleSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    combustible: {
+    fuel: {
         type: String,
         required: true
     },
@@ -37,23 +37,27 @@ const vehicleSchema = new mongoose.Schema({
         type: {},
         required: true
     },
-    uso: {
+    use: {
         type: String,
         required: true
     },
-    kilometraje: {
+    km: {
         type: Number,
         required: true
     },
-    actividades: {
+    activities: {
         type: [],
         required: true
     },
-    creado: {
+    created: {
         type: Date, 
         required: true
     },
-    actualizado: {
+    updated: {
+        type: Date, 
+        required: true
+    },
+    updatedKm: {
         type: Date, 
         required: true
     },

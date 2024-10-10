@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
-    verificado: {
+    verify: {
         type: Boolean,
         required: true
     },
@@ -14,36 +14,36 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         required: true
     },
-    vencimientoPremium: {
+    premiumExpiration: {
         type: Date, 
         required: true
     },
-    vehiculos: {
+    vehicles: {
         type: [],
         required: true
     },
-    categorias: {
+    categories: {
         type: [],
         required: true
     },
-    ingresos: {
+    entries: {
         type: Number,
         required: true
     },
-    ultimaConexion: {
+    lastConection: {
         type: Date, 
         required: true
     },
-    pais: {
+    country: {
         type: String,
         required: true
     },
-    provincia: {
+    province: {
         type: String,
         required: true
     },
-    localidad: {
-        type: String,
+    phone: {
+        type: Number,
         required: true
     },
     password: {
