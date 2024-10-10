@@ -314,5 +314,77 @@ const resetPassword = async (req, res) => {
     }
 }
 
+const sendDeleteVerifcation = async (req, res) => {
+    const {body} = req; //password
+    try {
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id});
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
+        if (user.verify !== true) {
+            return res.status(403).send("Tienes que tener tu correo verificado para poder enviar la solicitud.");
+        }
+        if (user.premium === true) {
+            return res.status(403).send("Para eliminar una cuenta que tiene premium activo debes comunicarte con soporte.");
+        }
+        const isMatch = await bcrypt.compare(body.password, user.password);
+        if (!isMatch) {
+            return res.status(403).send("Contraseña inválida.");
+        }
+        const payload = {
+            _id:user._id
+        }
+        const nuevoToken = jwt.sign(payload, process.env.JWT_CODE, {expiresIn: '10m'});
+        const link = `${user._id}/${nuevoToken}`;
+        const { error } = await resend.emails.send({
+            from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+            to: [user.email],
+            subject: 'Eliminar cuenta',
+            html: ` <strong>Ingresa en el siguiente link para eliminar tu cuenta: <a href="http://localhost:3000/user/delete/${link}">Click Aqui</a></strong>
+                    <br><p>Si no solicitaste eliminar tu cuenta, te recomendamos ignorar este email, cambiar tu contraseña y avisar al staff de inmediato.</p>
+                    <br><p>Este es un email automático, no debes responderlo.</p>`,
+        });
+        if (error) {
+            console.log(error)
+            return res.status(403).send("Error al enviar el email.");
+        }
+        return res.status(200).send("Te enviamos un email con la verificación para eliminar tu cuenta.");
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
+const deleteUser= async (req, res) => {
+    const {id, token} = req.params;
+    try {
+        jwt.verify(token, process.env.JWT_CODE);
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id})
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, volvé a intentarlo o comunicate con soporte.");
+        }
+        await Users.deleteOne({_id: _id});
+        const { error } = await resend.emails.send({
+            from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+            to: [user.email],
+            subject: 'Cuenta eliminada',
+            html: ` <strong>Tu cuenta fue eliminada exitosamente, si alguna vez quieres volver a usar la app tendras que crear una nueva.</strong>
+                    <br><p>Si no solicitaste eliminar tu cuenta porfavor comunicate con <a href="http://localhost:3000">soporte</a> de inmediato.</p>
+                    <br><p>Este es un email automático, no debes responderlo.</p>`,
+        });
+        if (error) {
+            console.log(error, user.email)
+        }
+        return res.status(200).send("Cuenta eliminada con éxito.");
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
 module.exports = { createUser, loginUser, userData, updateUser, updatePassword, updateCategories, sendEmailValidation, 
-                   emailValidation, forgotPassword, resetPassword }
+                   emailValidation, forgotPassword, resetPassword, sendDeleteVerifcation, deleteUser }
