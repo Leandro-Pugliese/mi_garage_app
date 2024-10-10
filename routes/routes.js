@@ -20,6 +20,7 @@ router.put("/user/validation/:id/:token", emailValidation);
 router.post("/user/forgot-password", forgotPassword);
 router.put("/user/forgot-password/:id/:token", resetPassword);
 router.post("/user/send-delete", isAuthenticated, sendDeleteVerifcation);
+router.delete("/user/send-delete", isAuthenticated, sendDeleteVerifcation);
 
 // Vehicle routes.
 router.post("/vehicle/create", isAuthenticated, createVehicle);
