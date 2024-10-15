@@ -291,17 +291,19 @@ const forgotPassword = async (req, res) => {
 }
 
 const resetPassword = async (req, res) => {
-    const {body} = req; //newPassword
-    const {id, token} = req.params
+    const {body} = req; //password
+    const {token} = req.params
     try {
-        const user = await Users.findOne({_id: id});
-        if (!user) {
-            return res.status(403).send("Credenciales inválidas.");
-        }
         jwt.verify(token, process.env.JWT_CODE);
+        const {id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: id})
+        if (!user) {
+            //Lo devuevlo en formato objeto para poder usar todo igual en el front, el jwt.verify devuelve con ese formato el error.
+            return res.status(403).send("Usuario no encontrado, volvé a intentarlo o comunicate con soporte.");
+        }
         const salt = await bcrypt.genSalt();
-        const hashed = await bcrypt.hash(body.newPassword, salt);
-        await Users.updateOne({_id: id},
+        const hashed = await bcrypt.hash(body.password, salt);
+        await Users.updateOne({_id: user._id},
             {
                 $set: {
                     password: hashed, salt
@@ -360,13 +362,14 @@ const sendDeleteVerifcation = async (req, res) => {
 }
 
 const deleteUser= async (req, res) => {
-    const {id, token} = req.params;
+    const {token} = req.params;
     try {
         jwt.verify(token, process.env.JWT_CODE);
         const {_id} = jwt.decode(token, {complete: true}).payload
         const user = await Users.findOne({_id: _id})
         if (!user) {
-            return res.status(403).send("Usuario no encontrado, volvé a intentarlo o comunicate con soporte.");
+            //Lo devuevlo en formato objeto para poder usar todo igual en el front, el jwt.verify devuelve con ese formato el error.
+            return res.status(403).send({message: "Usuario no encontrado, volvé a intentarlo o comunicate con soporte."});
         }
         await Users.deleteOne({_id: _id});
         const { error } = await resend.emails.send({

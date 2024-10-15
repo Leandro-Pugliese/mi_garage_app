@@ -18,9 +18,9 @@ router.put("/user/update-categories", isPremium, updateCategories);
 router.get("/user/send-validation", isAuthenticated, sendEmailValidation);
 router.put("/user/validation/:id/:token", emailValidation);
 router.post("/user/forgot-password", forgotPassword);
-router.put("/user/forgot-password/:id/:token", resetPassword);
+router.put("/user/forgot-password/:token", resetPassword);
 router.post("/user/send-delete", isAuthenticated, sendDeleteVerifcation);
-router.delete("/user/send-delete", isAuthenticated, sendDeleteVerifcation);
+router.delete("/user/delete/:token", isAuthenticated, deleteUser);
 
 // Vehicle routes.
 router.post("/vehicle/create", isAuthenticated, createVehicle);
