@@ -16,6 +16,10 @@ const paymentsSchema = new mongoose.Schema({
     paymentDate: {
         type: Date,
         required: true
+    },
+    paymentSource: {
+        type: String,
+        required: true
     }
 }, {versionKey: false});
 
