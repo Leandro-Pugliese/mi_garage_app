@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {isAuthenticated} = require("../authentication/authentication");
 const {isPremium} = require("../authentication/premiumVerification");
-const {createUser, loginUser, userData, updateUser, updatePassword, updateCategories, sendEmailValidation, emailValidation, forgotPassword, resetPassword} = require("../controllers/user.controller");
+const {createUser, loginUser, userData, updateUser, updatePassword, updateCategories, sendEmailValidation, emailValidation, forgotPassword, resetPassword, sendDeleteVerifcation, deleteUser} = require("../controllers/user.controller");
 const {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle} = require("../controllers/vehicle.controller");
 const {createActivity, activitiesList, activityData, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
@@ -18,7 +18,9 @@ router.put("/user/update-categories", isPremium, updateCategories);
 router.get("/user/send-validation", isAuthenticated, sendEmailValidation);
 router.put("/user/validation/:id/:token", emailValidation);
 router.post("/user/forgot-password", forgotPassword);
-router.put("/user/forgot-password/:id/:token", resetPassword);
+router.put("/user/forgot-password/:token", resetPassword);
+router.post("/user/send-delete", isAuthenticated, sendDeleteVerifcation);
+router.delete("/user/delete/:token", isAuthenticated, deleteUser);
 
 // Vehicle routes.
 router.post("/vehicle/create", isAuthenticated, createVehicle);
