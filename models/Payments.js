@@ -20,6 +20,10 @@ const paymentsSchema = new mongoose.Schema({
     paymentSource: {
         type: String,
         required: true
+    },
+    paymentAmount: {
+        type: Number,
+        required: true
     }
 }, {versionKey: false});
 

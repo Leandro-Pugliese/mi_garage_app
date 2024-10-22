@@ -16,7 +16,7 @@ const createPreference = async (req, res) => {
     }
     const {_id} = jwt.decode(token, {complete: true}).payload
     const userId = _id
-    const { email, amount } = req.body;
+    const { email } = req.body;
     const preference = new mercadopago.Preference(new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA }))
     const data = {
         body: {
@@ -24,7 +24,7 @@ const createPreference = async (req, res) => {
                 {
                     title: 'Membresía Premium',
                     quantity: 1,
-                    unit_price: parseFloat(amount)
+                    unit_price: 10
                 },
             ],
             payer: {
@@ -37,12 +37,12 @@ const createPreference = async (req, res) => {
                 pending: 'https://easy-qr-generator-chi.vercel.app'
             },
             auto_return: 'approved',
-            notification_url: 'https://9987-190-51-13-12.ngrok-free.app/check/payment' // URL para el webhook
+            notification_url: 'https://fa32-2802-8010-4521-b000-7d25-7a5c-2c5d-57f3.ngrok-free.app/check/payment' // URL para el webhook
         }
     };
     try {
         const response = await preference.create(data);
-        const init_point = response.sandbox_init_point || response.init_point;
+        const init_point = response.init_point || response.sandbox_init_point;
         res.status(200).send({ init_point, response });
     } catch (error) {
         console.error(error);
@@ -50,88 +50,75 @@ const createPreference = async (req, res) => {
     }
 }
 
-//Funcion para chequear datos del pago recibido en el webhook de MP.
-const getPaymentDetails = async (paymentId) => {
-    console.log('id del pago: ', paymentId)
-    try {
-      const response = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA}`
-        }
-      });
-      console.log('Respuesta del pago: ', response.data);
-    } catch (error) {
-      console.error('Error al obtener el pago:', error.response ? error.response.data : error.message);
-    }
-};
-// const getPaymentDetails = async (paymentId) => {
-//     // Inicializo el cliente de Mercado Pago
-//     const client = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA })
-    
-//     // Creo una instancia de la clase Payment
-//     const payment = new mercadopago.Payment(client);
-//     console.log('id del pago: ', paymentId)
-//     // Consultar un pago por ID
-//     payment.get({
-//         id: paymentId // El ID del pago que voy a consultar
-//     }).then(response => {
-//         console.log('Pago obtenido:', response);
-//     }).catch(error => {
-//         console.error('Error al obtener payment:', error);
-//     });
-// };
-
 const paymentNotification = async (req, res) => {
     try {
         const paymentData = req.body;
         console.log('Webhook recibido:', paymentData);
-        if (paymentData.topic === 'merchant_order') {
-            const url = `${paymentData.resource}`;
-            axios.get(url, {
-            headers: {
-                Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA}` // Autorización con el token
-            }
-            })
-            .then(response => {
-            console.log('Detalles del pedido:', response.data);
-            })
-            .catch(error => {
-            console.error('Error al obtener el pedido:', error.response ? error.response.data : error.message);
-            });
-        }
+        //Chequeo en el webhook la data del pago
         if (paymentData.data) {
-            const paymentId = paymentData.data.id; // El ID que recibes en el webhook
-            getPaymentDetails(paymentId);
-            // Verifico el estado del pago.
-            if (paymentData.action === 'payment.created' && paymentData.data.status === 'approved') {
-
-                // Actualizo el usuario a premium
-                const userId = paymentData.data.external_reference || paymentData.external_reference;
-                console.log('userId: ', userId);
-                const user = await Users.findOne({_id: userId});
-                if (user) {
-                    const currentDate = new Date(Date.now());
-                    const nextExpiryDate = add(currentDate, { months: 1 });
-                    await Users.updateOne({_id: userId},
-                        {
-                            $set: {
-                                premium: true,
-                                premiumExpiration: new Date(nextExpiryDate)
-                            }
+            const paymentId = paymentData.data.id; // El ID que recibo en el webhook
+            console.log('Id del pago: ', paymentId)
+            try {
+                const response = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA}`
+                    }
+                });
+                console.log('Respuesta del pago: ', response.data);
+                console.log('Status del pago: ', response.data.status);
+                console.log('External reference del pago: ', response.data.external_reference);
+                console.log('ID del pago: ', response.data.id);
+                console.log('Moneda del pago: ', response.data.currency_id);
+                console.log('Descripción del pago: ', response.data.description);
+                console.log('Forma de pago: ', response.data.payment_type_id);
+                console.log('Total del pago: ', response.data.transaction_amount);
+                // Verifico el estado del pago.
+                if (response.data.status === 'approved') {
+                    // Actualizo el usuario a premium
+                    const userId = response.data.external_reference;
+                    console.log('userId: ', userId);
+                    const user = await Users.findOne({_id: userId});
+                    if (user) {
+                        //Verifico si ya es usuario premium o no
+                        let nextExpiryDate = null;
+                        //Si es premium uso la fecha de vencimiento y le agrego un mes
+                        if (user.premium === true) {
+                            const expiryDate = new Date(user.premiumExpiration);
+                            nextExpiryDate = add(expiryDate, { months: 1 });
+                        } else {
+                            //Si no es premium agrego un mes desde la fecha del pago
+                            const currentDate = new Date(Date.now());
+                            nextExpiryDate = add(currentDate, { months: 1 });
                         }
-                    )
-                    // await Payments.create({
-                    //     user: user._id.toString(),
-                    //     paymentId: data.payment_id,
-                    //     paymentType: data.payment_type,
-                    //     paymentDate: new Date(Date.now()),
-                    //     paymentSource: 'notification'
-                    // });
+                        //Actualizo el usuario
+                        await Users.updateOne({_id: userId},
+                            {
+                                $set: {
+                                    premium: true,
+                                    premiumExpiration: new Date(nextExpiryDate)
+                                }
+                            }
+                        )
+                        //Creo el payment 
+                        const isPayment = await Payments.findOne({paymentId: response.data.id})
+                        if (!isPayment) {
+                            await Payments.create({
+                                user: userId,
+                                paymentId: response.data.id,
+                                paymentType: response.data.payment_type_id,
+                                paymentDate: new Date(Date.now()),
+                                paymentSource: 'notification',
+                                paymentAmount: response.data.transaction_amount
+                            });
+                        }
+                    }
                 }
+            } catch (error) {
+                console.error('Error al obtener el pago:', error.response ? error.response.data : error.message);
             }
         }
         // Respuesta  200 OK para que Mercado Pago sepa que recibi la notificación.
-        res.status(200).send('OK');
+        return res.status(200).send('OK');
     } catch (error) {
         console.error('Error al actualizar el usuario:', error);
         return res.status(500).send(error);
@@ -147,6 +134,23 @@ const paymentRedirect = async (req, res) => {
                 return res.status(403).send("Usuario no encontrado en la base de datos, porfavor contactar soporte.");
             }
             const isPayment = await Payments.findOne({paymentId: data.payment_id});
+            try {
+                const response = await axios.get(`https://api.mercadopago.com/v1/payments/${data.payment_id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA}`
+                    }
+                });
+                console.log('Respuesta del pago: ', response.data);
+                console.log('Status del pago: ', response.data.status);
+                console.log('External reference del pago: ', response.data.external_reference);
+                console.log('ID del pago: ', response.data.id);
+                console.log('Moneda del pago: ', response.data.currency_id);
+                console.log('Descripción del pago: ', response.data.description);
+                console.log('Forma de pago: ', response.data.payment_type_id);
+                console.log('Total del pago: ', response.data.transaction_amount);
+            } catch (error) {
+                console.error('Error al obtener el pago:', error.response ? error.response.data : error.message);
+            }
             //Verifico si existe un pago registrado con ese id
             if (isPayment) {
                 //Si hay un pago y ya fue redireccionado, lo freno
@@ -165,11 +169,12 @@ const paymentRedirect = async (req, res) => {
             } else {
                 //Si no hubo pago registrado todavia por notificacion de MP, creo el pago.
                 await Payments.create({
-                    user: user._id.toString(),
+                    user: data.external_reference,
                     paymentId: data.payment_id,
                     paymentType: data.payment_type,
                     paymentDate: new Date(Date.now()),
-                    paymentSource: 'redirect'
+                    paymentSource: 'redirect',
+                    paymentAmount: response.data.transaction_amount || 0
                 });
             }
             //Verifico si ya es usuario premium o no
