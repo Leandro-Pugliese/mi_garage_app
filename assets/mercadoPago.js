@@ -22,7 +22,7 @@ const createPreference = async (req, res) => {
         body: {
             items: [
                 {
-                    title: 'Membresía Premium',
+                    title: '1 mes de membresía premium (Mi Garage App)',
                     quantity: 1,
                     unit_price: 10
                 },
@@ -37,7 +37,7 @@ const createPreference = async (req, res) => {
                 pending: 'https://easy-qr-generator-chi.vercel.app'
             },
             auto_return: 'approved',
-            notification_url: 'https://fa32-2802-8010-4521-b000-7d25-7a5c-2c5d-57f3.ngrok-free.app/check/payment' // URL para el webhook
+            notification_url: 'https://89b5-2802-8010-4521-b000-7d25-7a5c-2c5d-57f3.ngrok-free.app/check/payment' // URL para el webhook
         }
     };
     try {
