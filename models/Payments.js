@@ -16,6 +16,14 @@ const paymentsSchema = new mongoose.Schema({
     paymentDate: {
         type: Date,
         required: true
+    },
+    paymentSource: {
+        type: String,
+        required: true
+    },
+    paymentAmount: {
+        type: Number,
+        required: true
     }
 }, {versionKey: false});
 
