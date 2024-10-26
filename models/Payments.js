@@ -24,7 +24,11 @@ const paymentsSchema = new mongoose.Schema({
     paymentAmount: {
         type: Number,
         required: true
-    }
+    },
+    paymentDescription: {
+        type: String,
+        required: true
+    },
 }, {versionKey: false});
 
 const Payment = mongoose.model("Payment", paymentsSchema);

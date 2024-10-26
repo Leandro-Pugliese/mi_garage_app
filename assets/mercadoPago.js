@@ -8,23 +8,28 @@ const jwt = require("jsonwebtoken");
 const { add } = require('date-fns');
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND);
+const { plansList } = require('./planesPremium');
 
 const createPreference = async (req, res) => {
     const token = req.header("Authorization");
     if (!token) {
-        return res.status(403).send('No se detecto un token en la petición.')
+        return res.status(403).send('No se detecto un token en la petición.');
     }
     const {_id} = jwt.decode(token, {complete: true}).payload
     const userId = _id
-    const { email } = req.body;
+    const { email, planName } = req.body; //Email, planName
+    const selectedPlan = plansList.filter((plan) => plan.name === planName);
+    if (selectedPlan.length !== 1) {
+        return res.status(403).send('El plan seleccionado no esta disponible.');
+    }
     const preference = new mercadopago.Preference(new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA }))
     const data = {
         body: {
             items: [
                 {
-                    title: '1 mes de membresía premium (Mi Garage App)',
+                    title: selectedPlan[0].description,
                     quantity: 1,
-                    unit_price: 10
+                    unit_price: selectedPlan[0].amount
                 },
             ],
             payer: {
@@ -90,12 +95,21 @@ const paymentNotification = async (req, res) => {
                             const currentDate = new Date(Date.now());
                             nextExpiryDate = add(currentDate, { months: 1 });
                         }
+                        //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
+                        const selectedPlan = plansList.filter((plan) => plan.description === response.data.description);
+                        if (selectedPlan.length !== 1) {
+                            console.log('Error en el filtrado del plan.');
+                        }
+                        const userPurchases = [...user.premiumPurchases];
+                        userPurchases.push(selectedPlan[0].name || "Compra premium");
                         //Actualizo el usuario
                         await Users.updateOne({_id: userId},
                             {
                                 $set: {
                                     premium: true,
-                                    premiumExpiration: new Date(nextExpiryDate)
+                                    premiumExpiration: new Date(nextExpiryDate),
+                                    premiumType: selectedPlan[0].type || 'None',
+                                    premiumPurchases: userPurchases
                                 }
                             }
                         )
@@ -108,7 +122,8 @@ const paymentNotification = async (req, res) => {
                                 paymentType: response.data.payment_type_id,
                                 paymentDate: new Date(Date.now()),
                                 paymentSource: 'notification',
-                                paymentAmount: response.data.transaction_amount
+                                paymentAmount: response.data.transaction_amount,
+                                paymentDescription: response.data.description
                             });
                         }
                     }
@@ -174,7 +189,8 @@ const paymentRedirect = async (req, res) => {
                     paymentType: data.payment_type,
                     paymentDate: new Date(Date.now()),
                     paymentSource: 'redirect',
-                    paymentAmount: response.data.transaction_amount || 0
+                    paymentAmount: response.data.transaction_amount || 0,
+                    paymentDescription: response.data.description || "-"
                 });
             }
             //Verifico si ya es usuario premium o no
@@ -188,12 +204,21 @@ const paymentRedirect = async (req, res) => {
                 const currentDate = new Date(Date.now());
                 nextExpiryDate = add(currentDate, { months: 1 });
             }
+            //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
+            const selectedPlan = plansList.filter((plan) => plan.description === response.data.description);
+            if (selectedPlan.length !== 1) {
+                console.log('Error en el filtrado del plan.');
+            }
+            const userPurchases = [...user.premiumPurchases];
+            userPurchases.push(selectedPlan[0].name || "Compra premium");
             //Actualizo el usuario
             await Users.updateOne({_id: data.external_reference},
                 {
                     $set: {
                         premium: true,
-                        premiumExpiration: new Date(nextExpiryDate)
+                        premiumExpiration: new Date(nextExpiryDate),
+                        premiumType: selectedPlan[0].type || 'None',
+                        premiumPurchases: userPurchases
                     }
                 }
             )

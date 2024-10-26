@@ -18,12 +18,44 @@ const userSchema = new mongoose.Schema({
         type: Date, 
         required: true
     },
+    premiumType: {
+        type: String, 
+        required: true
+    },
+    freePlan: {
+        type: Boolean,
+        required: true
+    },
+    premiumPurchases: {
+        type: [],
+        required: true
+    },
     vehicles: {
+        type: [],
+        required: true
+    },
+    transferredVehicles: {
         type: [],
         required: true
     },
     categories: {
         type: [],
+        required: true
+    },
+    notifications: {
+        type: [],
+        required: true
+    },
+    transferIterarions: {
+        type: Number,
+        required: true
+    },
+    imageIterations: {
+        type: Number,
+        required: true
+    },
+    emailIterations: {
+        type: Number,
         required: true
     },
     entries: {

@@ -61,6 +61,14 @@ const vehicleSchema = new mongoose.Schema({
         type: Date, 
         required: true
     },
+    exOwners: {
+        type: [],
+        required: true
+    },
+    blocked: {
+        type: Boolean, 
+        required: true
+    }
 }, {versionKey: false});
 
 const Vehicle = mongoose.model("Vehicle", vehicleSchema);

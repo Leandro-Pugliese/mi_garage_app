@@ -5,6 +5,8 @@ const Activities = require("../models/Activity");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND);
 
 const createVehicle = async (req, res) => {
     const {body} = req; //type, brand, model, year, patente, fuel, gnc, seguro, use, km
@@ -23,6 +25,10 @@ const createVehicle = async (req, res) => {
         if ((vehiculosUsuario.length >= 1) && (user.premium === false)) {
             return res.status(403).send("Para agregar más de un vehículo tienes que ser premium.");
         }
+        // Si el usuario es premium basic solo puede tener hasta un máximo de 3 vehiculos.
+        if ((vehiculosUsuario.length >= 3) && (user.premium === true) && (user.premiumType === 'Basic')) {
+            return res.status(403).send("Máximo de vehículos para plan Basic alcanzado (3), tiene que ser premium PLUS para poder agregar más vehículos.");
+        }
         //Creamos el vehículo
         const vehicle = await Vehicles.create({
             user: user._id.toString(),
@@ -39,7 +45,9 @@ const createVehicle = async (req, res) => {
             activities: [],
             created: new Date(Date.now()),
             updated: new Date(Date.now()),
-            updatedKm: new Date(Date.now())
+            updatedKm: new Date(Date.now()),
+            exOwners: [],
+            blocked: false
         })
         //Agregamos el vehículo a la lista del usuario.
         vehiculosUsuario.push(vehicle._id.toString());
@@ -165,6 +173,50 @@ const deleteVehicle = async (req, res) => {
         )
         return res.status(200).send("Vehículo eliminado exitosamente");
     } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
+const sendTransferVehicle = async (req, res) => {
+    const {body} = req; //newOwner(email), transactionKey
+    try {
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id});
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
+        //Agregar verificaciones de iteracion y tipo de premium.
+        const newOwner = await Users.findOne({email: body.newOwner});
+        if (!newOwner) {
+            return res.status(403).send("No hay un usuario registrado con el email ingresado.");
+        }
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send(error.message);
+    }
+}
+
+const acceptTransferVehicle = async (req, res) => {
+    const {body} = req; 
+    try {
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send(error.message);
+    }
+}
+
+const cancelTransferVehicle = async (req, res) => {
+    const {body} = req; 
+    try {
+
+    } catch (error) {
+        console.log(error);
         return res.status(500).send(error.message);
     }
 }
