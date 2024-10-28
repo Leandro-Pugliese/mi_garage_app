@@ -3,7 +3,7 @@ const router = express.Router();
 const {isAuthenticated} = require("../authentication/authentication");
 const {isPremium} = require("../authentication/premiumVerification");
 const {createUser, loginUser, userData, updateUser, updatePassword, updateCategories, sendEmailValidation, emailValidation, forgotPassword, resetPassword, sendDeleteVerifcation, deleteUser} = require("../controllers/user.controller");
-const {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle} = require("../controllers/vehicle.controller");
+const {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle, cancelTransferVehicle} = require("../controllers/vehicle.controller");
 const {createActivity, activitiesList, activityData, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
 const {createPreference, paymentNotification, paymentRedirect} = require("../assets/mercadoPago");
@@ -29,6 +29,7 @@ router.get("/vehicle/list", isAuthenticated, vehicleList);
 router.put("/vehicle/update/:id", isAuthenticated, updateVehicle);
 router.delete("/vehicle/delete/:id", isAuthenticated, deleteVehicle);
 router.post('/vehicle/transfer/send', isPremium, sendTransferVehicle);
+router.delete('/vehicle/transfer/cancel/:id', isPremium, cancelTransferVehicle);
 
 // Activity routes.
 router.post("/activity/create/:id", isAuthenticated, createActivity);

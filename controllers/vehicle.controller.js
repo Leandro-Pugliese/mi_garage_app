@@ -243,7 +243,12 @@ const sendTransferVehicle = async (req, res) => {
             uniqueCode: newIdTransfer,
             owner: user.email,
             newOwner: newOwner.email,
-            vehicle: vehicle._id.toString(),
+            vehicle: {
+                id: vehicle._id.toString(),
+                brand: vehicle.brand,
+                model: vehicle.model,
+                patente: vehicle.patente
+            },
             date: new Date(Date.now()),
             status: 'Active'
         })
@@ -303,13 +308,72 @@ const acceptTransferVehicle = async (req, res) => {
 }
 
 const cancelTransferVehicle = async (req, res) => {
-    const {body} = req; 
+    const {id} = req.params;
     try {
-
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id});
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
+        const transfer = await Transfers.findOne({id: id});
+        if (!transfer) {
+            return res.status(403).send('Transferencia no encontrada en la base de datos.');
+        }
+        if (transfer.owner !== user.email) {
+            return res.status(403).send('La transferencia no pertenece a tu usuario.');
+        }
+        await Transfers.deleteOne({id: body.transferId});
+        let userNotifications = [...user.notifications];
+        const newNotification = {
+            id: uuidv4(),
+            title: 'Transferencia de vehículo',
+            message: `Cancelaste la transferencia de tu vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} patente ${transfer.vehicle.patente} con el usuario ${transfer.newOwner}`,
+            date: new Date(Date.now()),
+            read: false
+        }
+        userNotifications.push(newNotification);
+        await Users.updateOne({_id: user._id},{
+            $set: {
+                notifications: userNotifications
+            }
+        });
+        const userOther = await Users.findOne({email: transfer.newOwner});
+        if (userOther) {
+            let otherNotifications = [...userOther.notifications];
+            const newOtherNotification = {
+                id: uuidv4(),
+                title: 'Transferencia de vehículo',
+                message: `El usuario ${user.email} canceló la transferencia del vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} patente ${transfer.vehicle.patente}.`,
+                date: new Date(Date.now()),
+                read: false
+            }
+            otherNotifications.push(newOtherNotification);
+            await Users.updateOne({_id: userOther._id},{
+                $set: {
+                    notifications: otherNotifications
+                }
+            })
+            const { error } = await resend.emails.send({
+                from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+                to: [userOther.email],
+                subject: 'Transferencia de vehículo cancelada',
+                html: ` <p>El usuario ${user.email}, canceló la trasnferencia del vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model}, patente: ${transfer.vehicle.patente}</p>
+                        <br><p>Este es un email automático, no debes responderlo.</p>       
+                        <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
+            });
+            if (error) {
+                console.log(error)
+            }
+        }
+        return res.status(201).send(`Transferencia del vehículo ${transfer.vehicle.patente} cancelada.`);
     } catch (error) {
         console.log(error);
         return res.status(500).send(error.message);
     }
 }
 
-module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle}
+module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle, cancelTransferVehicle}

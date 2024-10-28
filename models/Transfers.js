@@ -15,7 +15,7 @@ const transfersSchema = new mongoose.Schema({
         required: true
     },
     vehicle: {
-        type: String,
+        type: {},
         required: true
     },
     date: {
