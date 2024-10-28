@@ -32,13 +32,16 @@ const createUser = async (req, res) => {
             transferredVehicles: [],
             categories: ["MANTENIMIENTO", "SEGURO", "VERIFCACIÓN TÉCNICA", "PATENTE", "GNC", "OTROS"],
             notifications: [],
-            transferIterarions: 1,
+            transferIterarions: {
+                amount: 1,
+                sent: false
+            },
             imageIterations: 10,
             emailIterations: 5,
             entries: 0,
             lastConection: new Date(Date.now()),
-            country: body.country,
-            province: body.province,
+            country: body.country || "-",
+            province: body.province || "-",
             phone: body.phone || 0,
             password: hashed, salt
         })

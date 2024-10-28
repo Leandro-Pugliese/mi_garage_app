@@ -4,11 +4,11 @@ require("dotenv").config();
 const axios = require('axios');
 const Users = require("../models/User");
 const Payments = require("../models/Payments");
+const Plans = require('../models/plans');
 const jwt = require("jsonwebtoken");
 const { add } = require('date-fns');
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND);
-const { plansList } = require('./planesPremium');
 
 const createPreference = async (req, res) => {
     const token = req.header("Authorization");
@@ -18,7 +18,7 @@ const createPreference = async (req, res) => {
     const {_id} = jwt.decode(token, {complete: true}).payload
     const userId = _id
     const { email, planName } = req.body; //Email, planName
-    const selectedPlan = plansList.filter((plan) => plan.name === planName);
+    const selectedPlan = await Plans.findOne({name: planName});
     if (selectedPlan.length !== 1) {
         return res.status(403).send('El plan seleccionado no esta disponible.');
     }
@@ -96,7 +96,7 @@ const paymentNotification = async (req, res) => {
                             nextExpiryDate = add(currentDate, { months: 1 });
                         }
                         //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
-                        const selectedPlan = plansList.filter((plan) => plan.description === response.data.description);
+                        const selectedPlan = await Plans.findOne({description: response.data.description});
                         if (selectedPlan.length !== 1) {
                             console.log('Error en el filtrado del plan.');
                         }
@@ -205,7 +205,7 @@ const paymentRedirect = async (req, res) => {
                 nextExpiryDate = add(currentDate, { months: 1 });
             }
             //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
-            const selectedPlan = plansList.filter((plan) => plan.description === response.data.description);
+            const selectedPlan = await Plans.findOne({description: response.data.description});
             if (selectedPlan.length !== 1) {
                 console.log('Error en el filtrado del plan.');
             }
@@ -235,7 +235,7 @@ const paymentRedirect = async (req, res) => {
             }
             return res.status(200).send("Membresía premium activada");
         } else {
-            return res.status(403).send("payment status error");
+            return res.status(403).send("Payment status error");
         }
     } catch (error) {
         console.log(error)

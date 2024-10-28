@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema({
         required: true
     },
     transferIterarions: {
-        type: Number,
+        type: {},
         required: true
     },
     imageIterations: {

@@ -2,11 +2,13 @@ const express = require("express");
 const Users = require("../models/User");
 const Vehicles = require("../models/Vehicle");
 const Activities = require("../models/Activity");
+const Transfers = require("../models/Transfers");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND);
+const { v4: uuidv4 } = require('uuid');
 
 const createVehicle = async (req, res) => {
     const {body} = req; //type, brand, model, year, patente, fuel, gnc, seguro, use, km
@@ -178,7 +180,7 @@ const deleteVehicle = async (req, res) => {
 }
 
 const sendTransferVehicle = async (req, res) => {
-    const {body} = req; //newOwner(email), transactionKey
+    const {body} = req; //newOwner(email), vehicleId
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -189,12 +191,101 @@ const sendTransferVehicle = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        //Agregar verificaciones de iteracion y tipo de premium.
+        if (!user.premium || !user.verify) {
+            return res.status(403).send("Tienes que ser usuario premium y tener tu email verificado para poder trasferir un vehículo.");
+        }
+        if ((user.premiumType === 'Basic') && (user.transferIterarions.amount === 0)) {
+            return res.status(403).send("Ya utilizaste la cantidad máxima de transferencias de vehículos de tu plan este mes.");
+        }
+        if (user.transferIterarions.sent === true) {
+            return res.status(403).send("Ya enviaste una solicitud de transferencia, debes cancelarla o esperar que la contesten antes de enviar otra.");
+        }
         const newOwner = await Users.findOne({email: body.newOwner});
         if (!newOwner) {
             return res.status(403).send("No hay un usuario registrado con el email ingresado.");
         }
-
+        if (!newOwner.verify) {
+            return res.status(403).send(`El usuario ${newOwner.email} no tiene su email verificado, por lo tanto no es posible enviar la solicitud de trasnferencia del vehículo.`);
+        }
+        if (!newOwner.premium && newOwner.vehicles.length >= 1) {
+            return res.status(403).send(`El usuario ${newOwner.email} no puede tener más vehiculos registrados.`);
+        }
+        if (newOwner.premium && newOwner.premiumType === 'Basic' &&  newOwner.vehicles.length >= 3) {
+            return res.status(403).send(`El usuario ${newOwner.email} no puede tener más vehiculos registrados.`);
+        }
+        const vehicle = await Vehicles.findOne({_id: body.vehicleId});
+        if (!vehicle) {
+            return res.status(403).send('Vehículo no encontrado en la base de datos.');
+        }
+        if (user.vehicles.includes(vehicle._id.toString())) {
+            return res.status(403).send('El vehículo no esta en tu lista de vehículos.');
+        }
+        const newIdTransfer = uuidv4();
+        const payload = {
+            id: newIdTransfer
+        }
+        const newToken = jwt.sign(payload, process.env.JWT_CODE);
+        const { error } = await resend.emails.send({
+            from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+            to: [newOwner.email],
+            subject: 'Transferencia de vehículo',
+            html: ` <p>El usuario ${user.email}, quiere trasnferir a tu cuenta el vehículo ${vehicle.brand} ${vehicle.model}, patente: ${vehicle.patente}</p>
+                    <br><strong>Ingresa en el siguiente link para aceptar o cancelar la transferencia: <a href="http://localhost:3000/vehicle/transfer/${newToken}">Click Aqui</a></strong>
+                    <br><p>Este es un email automático, no debes responderlo.</p>       
+                    <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
+        });
+        if (error) {
+            console.log(error)
+            return res.status(403).send("Error al enviar el email con la solicitud de transferencia.");
+        }
+        //Creo la transferencia
+        await Transfers.create({
+            uniqueCode: newIdTransfer,
+            owner: user.email,
+            newOwner: newOwner.email,
+            vehicle: vehicle._id.toString(),
+            date: new Date(Date.now()),
+            status: 'Active'
+        })
+        let userNotifications = [...user.notifications];
+        const newNotification = {
+            id: uuidv4(),
+            title: 'Transferencia de vehículo',
+            message: `Enviaste una solicitud de transferencia de tu vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente} al usuario ${newOwner.email}`,
+            date: new Date(Date.now()),
+            read: false
+        }
+        userNotifications.push(newNotification)
+        //Hago update del usuario con la nueva notificacion y las iteraciones actualizadas
+        await Users.updateOne({_id: user._id},
+            {
+                $set: {
+                    notifications: userNotifications,
+                    transferIterarions: {
+                        amount: user.transferIterarions.amount - 1,
+                        sent: true
+                    },
+                }
+            }
+        )
+        //Creo notificacion para el otro usuario y hago el update tambien
+        let newOwnerNotifications = [...newOwner.notifications];
+        const newNotification2 = {
+            id: uuidv4(),
+            title: 'Transferencia de vehículo',
+            message: `El usuario ${user.email} te envió una solicitud de transferencia del vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente}, revisa tu casilla de correo para responder la solicitud de transferencia.`,
+            date: new Date(Date.now()),
+            read: false
+        }
+        newOwnerNotifications.push(newNotification2);
+        await Users.updateOne({_id: newOwner._id},
+            {
+                $set: {
+                    notifications: newOwnerNotifications
+                }
+            }
+        )
+        return res.status(200).end('Solicitud de transferencia de vehículo enviada exitosamente.');
     } catch (error) {
         console.log(error);
         return res.status(500).send(error.message);
@@ -221,4 +312,4 @@ const cancelTransferVehicle = async (req, res) => {
     }
 }
 
-module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle}
+module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle}

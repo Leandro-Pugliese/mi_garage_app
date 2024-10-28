@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
 
 const transfersSchema = new mongoose.Schema({
+    uniqueCode: {
+        type: String,
+        required: true,
+        unique: true
+    },
     owner: {
         type: String,
         required: true
@@ -16,6 +21,10 @@ const transfersSchema = new mongoose.Schema({
     date: {
         type: Date,
         required: true
+    },
+    status: {
+        type: String,
+        require: true
     }
 }, {versionKey: false});
 
