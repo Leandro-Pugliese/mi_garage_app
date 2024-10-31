@@ -25,6 +25,10 @@ const transfersSchema = new mongoose.Schema({
     status: {
         type: String,
         require: true
+    },
+    updated: {
+        type: Date,
+        required: true
     }
 }, {versionKey: false});
 

@@ -61,7 +61,7 @@ const vehicleSchema = new mongoose.Schema({
         type: Date, 
         required: true
     },
-    exOwners: {
+    oldOwners: {
         type: [],
         required: true
     },

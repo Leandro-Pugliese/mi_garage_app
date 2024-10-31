@@ -48,7 +48,7 @@ const createVehicle = async (req, res) => {
             created: new Date(Date.now()),
             updated: new Date(Date.now()),
             updatedKm: new Date(Date.now()),
-            exOwners: [],
+            oldOwners: [],
             blocked: false
         })
         //Agregamos el vehículo a la lista del usuario.
@@ -250,7 +250,8 @@ const sendTransferVehicle = async (req, res) => {
                 patente: vehicle.patente
             },
             date: new Date(Date.now()),
-            status: 'Active'
+            status: 'Active',
+            updated: new Date(Date.now())
         })
         let userNotifications = [...user.notifications];
         const newNotification = {
@@ -298,9 +299,179 @@ const sendTransferVehicle = async (req, res) => {
 }
 
 const acceptTransferVehicle = async (req, res) => {
-    const {body} = req; 
+    const {id} = req.params;
+    const {accepted} = req.body; //true/false
     try {
-
+        const transfer = await Transfers.findOne({uniqueCode: id});
+        if (!transfer) {
+            return res.status(403).send('Transferencia no encontrada en la base de datos.');
+        }
+        if (transfer.status === 'Complete') {
+            return res.status(403).send('La transferencia ya fue completada.');
+        }
+        if ((transfer.status !== 'Complete') && (transfer.status !== 'Active')) {
+            return res.status(403).send('La transferencia no puede ser completada, porfavor contacta a soporte.');
+        }
+        const oldOwner = await Users.findOne({email: transfer.owner});
+        if (!oldOwner) {
+            return res.status(403).send('Dueño no encontrado en la base de datos.');
+        }
+        const vehicle = await Vehicles.findOne({_id: transfer.vehicle.id});
+        if (!vehicle) {
+            return res.status(403).send('Vehículo no encontrado en la base de datos.');
+        }
+        const newOwner = await Users.findOne({email: transfer.newOwner});
+        if (!newOwner) {
+            return res.status(403).send('Próximo dueño no encontrado en la base de datos.');
+        }
+        if ((newOwner.vehicles.length >= 1) && (newOwner.premiumType === 'Default')) {
+            return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan a premium para agegar más vehículos.');
+        }
+        if ((newOwner.vehicles.length >= 3) && (newOwner.premiumType === 'Basic')) {
+            return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan premium Basic a premium Plus para agegar más vehículos.');
+        }
+        let oldOwnerNotifications = [...oldOwner.notifications];
+        let newOwnerNotifications = [...newOwner.notifications];
+        if (accepted === true) {
+            //Modifico oldOwner
+            //Quito vehiculo de la lista
+            const oldOwnerVehicles = [...oldOwner.vehicles];
+            const oldOwnerVehiclesFilter = oldOwnerVehicles.filter((element) => element !== vehicle._id.toString());
+            //Agregarlo a la lista de ex-vehiculos
+            let oldOwnerOldVehicles = [...oldOwner.transferredVehicles];
+            oldOwnerOldVehicles.push(vehicle._id.toString());
+            //Envio notificacion y correo con info de la trasferencia
+            const newNotification = {
+                id: uuidv4(),
+                title: 'Transferencia de vehículo',
+                message: `El usuario ${newOwner.email} aceptó la transferencia de tu vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente}.`,
+                date: new Date(Date.now()),
+                read: false
+            }
+            oldOwnerNotifications.push(newNotification);
+            //Modificar newOwner
+            //Agregar vehiculo en lista vehiculos
+            let newOwnerVehicles = [...newOwner.vehicles];
+            newOwnerVehicles.push(vehicle._id.toString());
+            //Enviar notificacion con info de la transferencia.
+            const newNotification2 = {
+                id: uuidv4(),
+                title: 'Transferencia de vehículo',
+                message: `Aceptaste la transferencia del vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente} con el usuario ${newOwner.email}, puedes acceder al mismo desde "Mis Vehículos".`,
+                date: new Date(Date.now()),
+                read: false
+            }
+            newOwnerNotifications.push(newNotification2);
+            //Modifico el vehiculo
+            let oldOwnersVehicle = [...vehicle.oldOwners];
+            oldOwnersVehicle.push(transfer.oldOwner)
+            await Vehicles.updateOne({_id: vehicle._id},{
+                $set: {
+                    user: newOwner._id.toString(),
+                    oldOwners: oldOwnersVehicle
+                }
+            });
+            //Modifico las actividades del vehiculo
+            await Activities.updateMany({user: oldOwner._id.toString()},{
+                $set: {
+                    user: newOwner._id.toString()
+                }
+            });
+            //Modifico el status de la trasnferencia
+            await Transfers.updateOne({_id: transfer._id},{
+                $set: {
+                    status: 'Complete',
+                    updated: new Date(Date.now())
+                }
+            });
+            //Hago updates de los usuarios
+            await Users.updateOne({_id: oldOwner._id},{
+                $set: {
+                    vehicles: oldOwnerVehiclesFilter,
+                    transferredVehicles: oldOwnerOldVehicles,
+                    notifications: oldOwnerNotifications
+                }
+            });
+            await Users.updateOne({_id: newOwner._id},{
+                $set: {
+                    vehicles: newOwnerVehicles,
+                    notifications: newOwnerNotifications
+                }
+            });
+            //Si todo se actualizo ok, envio los emails a los usuarios
+            if (oldOwner) { //Condicional para poder enviar email de la misma forma debajo en newOwner
+                const { error } = await resend.emails.send({
+                    from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+                    to: [oldOwner.email],
+                    subject: 'Transferencia de vehículo',
+                    html: ` <p>La trasnferencia del vehículo ${vehicle.brand} ${vehicle.model} patente: ${vehicle.patente} con el usuario ${newOwner.email}, se completó con éxito, ya no tendras acceso al vehículo desde la app.</p>
+                            <br><p>Este es un email automático, no debes responderlo.</p>       
+                            <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
+                });
+                if (error) {
+                    console.log('Error enviando email al oldOwner en aceptar transferencia (true): ', error)
+                }
+            }
+            const { error } = await resend.emails.send({
+                from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+                to: [newOwner.email],
+                subject: 'Transferencia de vehículo',
+                html: ` <p>La trasnferencia del vehículo ${vehicle.brand} ${vehicle.model} patente: ${vehicle.patente} con el usuario ${oldOwner.email}, se completó con éxito, puedes acceder a tu nuevo vehículo desde la <a href="http://localhost:3000/">APP</a>.</p>
+                        <br><p>Este es un email automático, no debes responderlo.</p>       
+                        <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
+            });
+            if (error) {
+                console.log('Error enviando email al newOwner en aceptar transferencia (true): ', error)
+            }
+        } else if (accepted === false) {
+            const newNotification = {
+                id: uuidv4(),
+                title: 'Transferencia de vehículo',
+                message: `El usuario ${newOwner.email} rechazó la transferencia de tu vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente}.`,
+                date: new Date(Date.now()),
+                read: false
+            }
+            oldOwnerNotifications.push(newNotification);
+            await Users.updateOne({_id: oldOwner._id},{
+                $set: {
+                    notifications: oldOwnerNotifications
+                }
+            });
+            const newNotification2 = {
+                id: uuidv4(),
+                title: 'Transferencia de vehículo',
+                message: `Rechazaste la transferencia del vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente} con el usuario ${newOwner.email}`,
+                date: new Date(Date.now()),
+                read: false
+            }
+            newOwnerNotifications.push(newNotification2);
+            await Users.updateOne({_id: newOwner._id},{
+                $set: {
+                    notifications: newOwnerNotifications
+                }
+            });
+            //Modifico el status de la transferencia
+            await Transfers.updateOne({uniqueCode: transfer._id},{
+                $set: {
+                    status: 'Rejected',
+                    updated: new Date(Date.now())
+                }
+            });
+            const { error } = await resend.emails.send({
+                from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
+                to: [oldOwner.email],
+                subject: 'Transferencia de vehículo',
+                html: ` <p>El usuario ${newOwner.email}, rechazó la trasnferencia del vehículo ${vehicle.brand} ${vehicle.model}, patente: ${vehicle.patente}</p>
+                        <br><p>Este es un email automático, no debes responderlo.</p>       
+                        <br><p>Si no te registraste en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
+            });
+            if (error) {
+                console.log('Error enviando email en aceptar transferencia (false): ', error)
+            }
+            return res.status(403).send('Transferencia rechazada exitosamente.');
+        } else {
+            return res.status(403).send('Error al aceptar/rechazar la transferencia.');
+        }
     } catch (error) {
         console.log(error);
         return res.status(500).send(error.message);
@@ -319,12 +490,15 @@ const cancelTransferVehicle = async (req, res) => {
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
-        const transfer = await Transfers.findOne({id: id});
+        const transfer = await Transfers.findOne({uniqueCode: id});
         if (!transfer) {
             return res.status(403).send('Transferencia no encontrada en la base de datos.');
         }
         if (transfer.owner !== user.email) {
             return res.status(403).send('La transferencia no pertenece a tu usuario.');
+        }
+        if (transfer.status === 'Complete') {
+            return res.status(403).send('La transferencia ya fue realizada, no puedes cancelarla.');
         }
         await Transfers.deleteOne({id: body.transferId});
         let userNotifications = [...user.notifications];
@@ -376,4 +550,4 @@ const cancelTransferVehicle = async (req, res) => {
     }
 }
 
-module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle, cancelTransferVehicle}
+module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle, acceptTransferVehicle, cancelTransferVehicle}
