@@ -7,6 +7,7 @@ const {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, se
 const {createActivity, activitiesList, activityData, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
 const {createPreference, paymentNotification, paymentRedirect} = require("../assets/mercadoPago");
+const {createReminder} = require('../controllers/reminder.controller');
 
 // User routes.
 router.post("/user/create", createUser);
@@ -45,6 +46,9 @@ router.delete("/activity/delete/:id", isAuthenticated, deleteActivity);
 router.post("/buy/premium", isAuthenticated, createPreference);
 router.post("/check/payment", paymentNotification);
 router.get("/check/payment-redirect", paymentRedirect);
+
+// Reminder routes
+router.post('/reminder/create', isPremium, createReminder);
 
 // Non-existent routes.
 router.get("*", (req, res) => {

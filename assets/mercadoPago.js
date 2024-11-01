@@ -19,17 +19,20 @@ const createPreference = async (req, res) => {
     const userId = _id
     const { email, planName } = req.body; //Email, planName
     const selectedPlan = await Plans.findOne({name: planName});
-    if (selectedPlan.length !== 1) {
+    if (!selectedPlan) {
         return res.status(403).send('El plan seleccionado no esta disponible.');
+    }
+    if (!selectedPlan.description || !selectedPlan.amount) {
+        return res.status(403).send('El plan seleccionado no tiene descripción o monto asignados.');
     }
     const preference = new mercadopago.Preference(new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA }))
     const data = {
         body: {
             items: [
                 {
-                    title: selectedPlan[0].description,
+                    title: selectedPlan.description,
                     quantity: 1,
-                    unit_price: selectedPlan[0].amount
+                    unit_price: selectedPlan.amount
                 },
             ],
             payer: {
@@ -76,7 +79,7 @@ const paymentNotification = async (req, res) => {
                 console.log('Moneda del pago: ', response.data.currency_id);
                 console.log('Descripción del pago: ', response.data.description);
                 console.log('Forma de pago: ', response.data.payment_type_id);
-                console.log('Total del pago: ', response.data.transaction_amount);
+                console.log('Total del pago: ', response.data.transaction_amount, typeof response.data.transaction_amount);
                 // Verifico el estado del pago.
                 if (response.data.status === 'approved') {
                     // Actualizo el usuario a premium
@@ -84,31 +87,35 @@ const paymentNotification = async (req, res) => {
                     console.log('userId: ', userId);
                     const user = await Users.findOne({_id: userId});
                     if (user) {
+                        //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
+                        let selectedPlan = await Plans.findOne({description: response.data.description});
+                        console.log(selectedPlan);
+                        if (!selectedPlan.length) {
+                            console.log('Error en el filtrado del plan.');
+                            selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
+                            console.log(selectedPlan);
+                        }
+                        const userPurchases = [...user.premiumPurchases];
+                        userPurchases.push(selectedPlan.name || "Compra premium");
                         //Verifico si ya es usuario premium o no
                         let nextExpiryDate = null;
-                        //Si es premium uso la fecha de vencimiento y le agrego un mes
+                        //Si es premium uso la fecha de vencimiento y le agrego los meses del plan comprado
+                        const paidMonths = selectedPlan.months || 1
                         if (user.premium === true) {
                             const expiryDate = new Date(user.premiumExpiration);
-                            nextExpiryDate = add(expiryDate, { months: 1 });
+                            nextExpiryDate = add(expiryDate, { months: paidMonths });
                         } else {
                             //Si no es premium agrego un mes desde la fecha del pago
                             const currentDate = new Date(Date.now());
-                            nextExpiryDate = add(currentDate, { months: 1 });
+                            nextExpiryDate = add(currentDate, { months: paidMonths });
                         }
-                        //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
-                        const selectedPlan = await Plans.findOne({description: response.data.description});
-                        if (selectedPlan.length !== 1) {
-                            console.log('Error en el filtrado del plan.');
-                        }
-                        const userPurchases = [...user.premiumPurchases];
-                        userPurchases.push(selectedPlan[0].name || "Compra premium");
                         //Actualizo el usuario
                         await Users.updateOne({_id: userId},
                             {
                                 $set: {
                                     premium: true,
                                     premiumExpiration: new Date(nextExpiryDate),
-                                    premiumType: selectedPlan[0].type || 'None',
+                                    premiumType: selectedPlan.type || 'None',
                                     premiumPurchases: userPurchases
                                 }
                             }
@@ -193,31 +200,36 @@ const paymentRedirect = async (req, res) => {
                     paymentDescription: response.data.description || "-"
                 });
             }
+            //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
+            let selectedPlan = await Plans.findOne({description: response.data.description});
+            console.log(selectedPlan)
+            if (!selectedPlan) {
+                console.log('Error en el filtrado del plan.');
+                selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
+                console.log(selectedPlan)
+            }
+            const userPurchases = [...user.premiumPurchases];
+            userPurchases.push(selectedPlan.name || "Compra premium");
+            const paidMonths = selectedPlan.months || 1
             //Verifico si ya es usuario premium o no
             let nextExpiryDate = null;
             //Si es premium uso la fecha de vencimiento y le agrego un mes
             if (user.premium === true) {
                 const expiryDate = new Date(user.premiumExpiration);
-                nextExpiryDate = add(expiryDate, { months: 1 });
+                nextExpiryDate = add(expiryDate, { months: paidMonths });
             } else {
                 //Si no es premium agrego un mes desde la fecha del pago
                 const currentDate = new Date(Date.now());
-                nextExpiryDate = add(currentDate, { months: 1 });
+                nextExpiryDate = add(currentDate, { months: paidMonths });
             }
-            //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
-            const selectedPlan = await Plans.findOne({description: response.data.description});
-            if (selectedPlan.length !== 1) {
-                console.log('Error en el filtrado del plan.');
-            }
-            const userPurchases = [...user.premiumPurchases];
-            userPurchases.push(selectedPlan[0].name || "Compra premium");
+            
             //Actualizo el usuario
             await Users.updateOne({_id: data.external_reference},
                 {
                     $set: {
                         premium: true,
                         premiumExpiration: new Date(nextExpiryDate),
-                        premiumType: selectedPlan[0].type || 'None',
+                        premiumType: selectedPlan.type || 'None',
                         premiumPurchases: userPurchases
                     }
                 }

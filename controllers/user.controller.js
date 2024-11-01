@@ -33,10 +33,10 @@ const createUser = async (req, res) => {
             categories: ["MANTENIMIENTO", "SEGURO", "VERIFCACIÓN TÉCNICA", "PATENTE", "GNC", "OTROS"],
             notifications: [],
             transferIterarions: {
-                amount: 1,
+                amount: 2,
                 sent: false
             },
-            imageIterations: 10,
+            imageIterations: 50,
             emailIterations: 5,
             entries: 0,
             lastConection: new Date(Date.now()),
