@@ -11,15 +11,15 @@ const resend = new Resend(process.env.RESEND);
 const signToken = (_id, email) => jwt.sign({_id, email}, process.env.JWT_CODE);
 
 const createUser = async (req, res) => {
-    const {body} = req; //email, country, province, phone, password
     try {
-        const emailUser = body.email.toLowerCase();
+        const {email, country, province, phone, password} = req.body;
+        const emailUser = email.toLowerCase();
         const isUser = await Users.findOne({email: emailUser});
         if (isUser) {
             return res.status(403).send("El email ingresado pertenece a un usuario ya registrado.");
         }
         const salt = await bcrypt.genSalt();
-        const hashed = await bcrypt.hash(body.password, salt);
+        const hashed = await bcrypt.hash(password, salt);
         const user = await Users.create({
             email: emailUser,
             verify: false,
@@ -40,9 +40,9 @@ const createUser = async (req, res) => {
             emailIterations: 5,
             entries: 0,
             lastConection: new Date(Date.now()),
-            country: body.country || "-",
-            province: body.province || "-",
-            phone: body.phone || 0,
+            country: country || "-",
+            province: province || "-",
+            phone: phone || 0,
             password: hashed, salt
         })
         const token = signToken(user._id, user.email);
@@ -54,14 +54,14 @@ const createUser = async (req, res) => {
 }
 
 const loginUser = async (req, res) => {
-    const {body} = req; //Email, password
     try {
-        const emailUser = body.email.toLowerCase();
+        const {email, password} = req.body;
+        const emailUser = email.toLowerCase();
         const user = await Users.findOne({email: emailUser})
         if (!user) {
             return res.status(403).send("El email y/o la contraseña son incorrectos.")
         } 
-        const isMatch = await bcrypt.compare(body.password, user.password);
+        const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
             await Users.updateOne({ _id: user._id },
                 {
@@ -72,7 +72,7 @@ const loginUser = async (req, res) => {
                 }
             );
             const token = signToken(user._id, user.email);
-            return res.status(200).send({token, user});
+            return res.status(200).send({token});
         }
         return res.status(403).send("El email y/o la contraseña son incorrectos.");
     } catch (error) {
@@ -98,8 +98,8 @@ const userData = async (req, res) => {
 }
 
 const updateUser = async (req, res) => {
-    const {body} = req; //country, province, phone.
     try {
+        const {country, province, phone} = req.body;
         const token = req.header("Authorization");
         if (!token) {
             return res.status(403).send('No se detecto un token en la petición.');
@@ -112,9 +112,9 @@ const updateUser = async (req, res) => {
         await Users.updateOne({email: email},
             {
                 $set: {
-                    country: body.country || user.country,
-                    province: body.province || user.province,
-                    phone: body.phone || user.phone
+                    country: country || user.country,
+                    province: province || user.province,
+                    phone: phone || user.phone
                 }
             }
         )
@@ -125,8 +125,8 @@ const updateUser = async (req, res) => {
 }
 
 const updatePassword = async (req, res) => {
-    const {body} = req; //oldPassword, newPassword
     try {
+        const {oldPassword, newPassword} = req.body;
         const token = req.header("Authorization");
         if (!token) {
             return res.status(403).send('No se detecto un token en la petición.');
@@ -136,12 +136,12 @@ const updatePassword = async (req, res) => {
         if (!user) {
             return res.status(403).send("Credenciales inválidas.");
         }
-        const isMatch = await bcrypt.compare(body.oldPassword, user.password);
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
         if (!isMatch) {
             return res.status(403).send("Contraseña actual inválida.");
         }
         const salt = await bcrypt.genSalt();
-        const hashed = await bcrypt.hash(body.newPassword, salt);
+        const hashed = await bcrypt.hash(newPassword, salt);
         await Users.updateOne({email: email},
             {
                 $set: {
@@ -156,8 +156,8 @@ const updatePassword = async (req, res) => {
 }
 
 const updateCategories = async (req, res) => {
-    const {body} = req; //operation("ADD"/"REMOVE"), category.
     try {
+        const {operation, category} = req.body;
         const token = req.header("Authorization");
         if (!token) {
             return res.status(403).send('No se detecto un token en la petición.')
@@ -169,19 +169,19 @@ const updateCategories = async (req, res) => {
         }
         let categorias = [...user.categories];
         let msj = '';
-        if (body.operation === "ADD") {
+        if (operation === "ADD") {
              // Chequeo que no este repetida la categoría.
-             if (categorias.includes(body.category) === true) {
+             if (categorias.includes(category) === true) {
                 return res.status(403).send("La categoría ya esta registrada.");
             }
             // Agrego la categoría ingresada.
-            categorias.push(body.category);
+            categorias.push(category);
             msj = "Categoría agregada exitosamente."
-        } else if (body.operation === "REMOVE") {
+        } else if (operation === "REMOVE") {
             // Tengo que chequear si esa categoría no se utiliza en alguna actividad antes de borrarla.
             const activities = await Activities.find({user: user._id});
             // Filtro las actividades del usuario con la categoría que quiere eliminar.
-            const categoriaUtilizada = activities.filter((activity) => activity.type === body.category);
+            const categoriaUtilizada = activities.filter((activity) => activity.type === category);
             if (categoriaUtilizada.length >= 1) { // Si hay al menos una actividad con esa categoría no la podes borrar.
                 return res.status(403).send("No es posible eliminar esta categoría porque hay actividades en la base de datos que pertenecen a la misma, modifica la categoría de esas actividades para poder eliminarla.");
             }
@@ -192,7 +192,7 @@ const updateCategories = async (req, res) => {
             // En caso de que se pueda borrar, la quitamos de la lista.
             for (let indice in categorias){
                 let categoriaOriginal = categorias[indice];
-                if (categoriaOriginal === body.category) {
+                if (categoriaOriginal === category) {
                     categorias.splice(indice, 1);
                 }
             }
@@ -273,9 +273,9 @@ const emailValidation= async (req, res) => {
 }
 
 const forgotPassword = async (req, res) => {
-    const {body} = req; //Email
     try {
-        const emailUser = body.email.toLowerCase();
+        const {email} = req.body;
+        const emailUser = email.toLowerCase();
         const user = await Users.findOne({email: emailUser});
         if (!user) {
             return res.status(403).send("No hay un usuario registrado con el email ingresado.");
@@ -302,7 +302,7 @@ const forgotPassword = async (req, res) => {
 }
 
 const resetPassword = async (req, res) => {
-    const {body} = req; //password
+    const {password} = req.body;
     const {token} = req.params
     try {
         jwt.verify(token, process.env.JWT_CODE);
@@ -313,7 +313,7 @@ const resetPassword = async (req, res) => {
             return res.status(403).send("Usuario no encontrado, volvé a intentarlo o comunicate con soporte.");
         }
         const salt = await bcrypt.genSalt();
-        const hashed = await bcrypt.hash(body.password, salt);
+        const hashed = await bcrypt.hash(password, salt);
         await Users.updateOne({_id: user._id},
             {
                 $set: {
@@ -328,8 +328,8 @@ const resetPassword = async (req, res) => {
 }
 
 const sendDeleteVerifcation = async (req, res) => {
-    const {body} = req; //password
     try {
+        const {password} = req.body;
         const token = req.header("Authorization");
         if (!token) {
             return res.status(403).send('No se detecto un token en la petición.')
@@ -345,7 +345,7 @@ const sendDeleteVerifcation = async (req, res) => {
         if (user.premium === true) {
             return res.status(403).send("Para eliminar una cuenta que tiene premium activo debes comunicarte con soporte.");
         }
-        const isMatch = await bcrypt.compare(body.password, user.password);
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(403).send("Contraseña inválida.");
         }

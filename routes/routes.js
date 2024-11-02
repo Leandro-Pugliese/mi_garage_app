@@ -7,7 +7,8 @@ const {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, se
 const {createActivity, activitiesList, activityData, createActivityPremium, updateActivity, updateActivityPremium, deleteActivity} = require("../controllers/activity.controller");
 const {uploadImagen} = require("../assets/multer");
 const {createPreference, paymentNotification, paymentRedirect} = require("../assets/mercadoPago");
-const {createReminder} = require('../controllers/reminder.controller');
+const {createReminder, reminderData, updateReminder, deleteReminder, remindersList} = require('../controllers/reminder.controller');
+const {plansList} = require('../controllers/plans.controller');
 
 // User routes.
 router.post("/user/create", createUser);
@@ -49,10 +50,17 @@ router.get("/check/payment-redirect", paymentRedirect);
 
 // Reminder routes
 router.post('/reminder/create', isPremium, createReminder);
+router.get('/reminder/list', isPremium, remindersList);
+router.get('/reminder/data/:id', isPremium, reminderData);
+router.put('/reminder/update/:id', isPremium, updateReminder);
+router.delete('/reminder/delete/:id', isPremium, deleteReminder);
+
+// Plans routes
+router.get('/plans', isAuthenticated, plansList);
 
 // Non-existent routes.
 router.get("*", (req, res) => {
-    return res.status(404).send("¡Esta página no existe!")
+    return res.status(404).send("¡Esta página no existe!");
 })
 
 module.exports = router

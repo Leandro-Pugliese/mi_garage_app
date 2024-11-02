@@ -1,18 +1,14 @@
 const express = require("express");
 const Plans = require("../models/plans");
-//const {plansList} = require('../assets/planesPremium');
 
-// const createPlans = async (req, res) => {
-//     for (let i=0; i < plansList.length; i++) {
-//         await Plans.create({
-//             name: plansList[i].name,
-//             description: plansList[i].description,
-//             amount: plansList[i].amount,
-//             months: plansList[i].months,
-//             type: plansList[i].type
-//         })
-//     }
-//     return res.status(201).send('Planes creados');
-// }
+const plansList = async (req, res) => {
+    try {
+        const plans = await Plans.find();
+        return res.status(200).send(plans);
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send(error.message);
+    }
+}
 
-// module.exports = {createPlans}
+ module.exports = {plansList}
