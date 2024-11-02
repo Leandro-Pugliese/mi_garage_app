@@ -4,6 +4,7 @@ require("dotenv").config();
 const axios = require('axios');
 const Users = require("../models/User");
 const Payments = require("../models/Payments");
+const Plans = require('../models/plans');
 const jwt = require("jsonwebtoken");
 const { add } = require('date-fns');
 const { Resend } = require("resend");
@@ -12,19 +13,26 @@ const resend = new Resend(process.env.RESEND);
 const createPreference = async (req, res) => {
     const token = req.header("Authorization");
     if (!token) {
-        return res.status(403).send('No se detecto un token en la petición.')
+        return res.status(403).send('No se detecto un token en la petición.');
     }
     const {_id} = jwt.decode(token, {complete: true}).payload
     const userId = _id
-    const { email } = req.body;
+    const { email, planName } = req.body; //Email, planName
+    const selectedPlan = await Plans.findOne({name: planName});
+    if (!selectedPlan) {
+        return res.status(403).send('El plan seleccionado no esta disponible.');
+    }
+    if (!selectedPlan.description || !selectedPlan.amount) {
+        return res.status(403).send('El plan seleccionado no tiene descripción o monto asignados.');
+    }
     const preference = new mercadopago.Preference(new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA }))
     const data = {
         body: {
             items: [
                 {
-                    title: '1 mes de membresía premium (Mi Garage App)',
+                    title: selectedPlan.description,
                     quantity: 1,
-                    unit_price: 10
+                    unit_price: selectedPlan.amount
                 },
             ],
             payer: {
@@ -37,7 +45,7 @@ const createPreference = async (req, res) => {
                 pending: 'https://easy-qr-generator-chi.vercel.app'
             },
             auto_return: 'approved',
-            notification_url: 'https://89b5-2802-8010-4521-b000-7d25-7a5c-2c5d-57f3.ngrok-free.app/check/payment' // URL para el webhook
+            notification_url: 'https://e8bb-190-51-9-137.ngrok-free.app/check/payment' // URL para el webhook
         }
     };
     try {
@@ -71,7 +79,7 @@ const paymentNotification = async (req, res) => {
                 console.log('Moneda del pago: ', response.data.currency_id);
                 console.log('Descripción del pago: ', response.data.description);
                 console.log('Forma de pago: ', response.data.payment_type_id);
-                console.log('Total del pago: ', response.data.transaction_amount);
+                console.log('Total del pago: ', response.data.transaction_amount, typeof response.data.transaction_amount);
                 // Verifico el estado del pago.
                 if (response.data.status === 'approved') {
                     // Actualizo el usuario a premium
@@ -79,23 +87,36 @@ const paymentNotification = async (req, res) => {
                     console.log('userId: ', userId);
                     const user = await Users.findOne({_id: userId});
                     if (user) {
+                        //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
+                        let selectedPlan = await Plans.findOne({description: response.data.description});
+                        console.log(selectedPlan);
+                        if (!selectedPlan.length) {
+                            console.log('Error en el filtrado del plan.');
+                            selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
+                            console.log(selectedPlan);
+                        }
+                        const userPurchases = [...user.premiumPurchases];
+                        userPurchases.push(selectedPlan.name || "Compra premium");
                         //Verifico si ya es usuario premium o no
                         let nextExpiryDate = null;
-                        //Si es premium uso la fecha de vencimiento y le agrego un mes
+                        //Si es premium uso la fecha de vencimiento y le agrego los meses del plan comprado
+                        const paidMonths = selectedPlan.months || 1
                         if (user.premium === true) {
                             const expiryDate = new Date(user.premiumExpiration);
-                            nextExpiryDate = add(expiryDate, { months: 1 });
+                            nextExpiryDate = add(expiryDate, { months: paidMonths });
                         } else {
                             //Si no es premium agrego un mes desde la fecha del pago
                             const currentDate = new Date(Date.now());
-                            nextExpiryDate = add(currentDate, { months: 1 });
+                            nextExpiryDate = add(currentDate, { months: paidMonths });
                         }
                         //Actualizo el usuario
                         await Users.updateOne({_id: userId},
                             {
                                 $set: {
                                     premium: true,
-                                    premiumExpiration: new Date(nextExpiryDate)
+                                    premiumExpiration: new Date(nextExpiryDate),
+                                    premiumType: selectedPlan.type || 'None',
+                                    premiumPurchases: userPurchases
                                 }
                             }
                         )
@@ -108,7 +129,8 @@ const paymentNotification = async (req, res) => {
                                 paymentType: response.data.payment_type_id,
                                 paymentDate: new Date(Date.now()),
                                 paymentSource: 'notification',
-                                paymentAmount: response.data.transaction_amount
+                                paymentAmount: response.data.transaction_amount,
+                                paymentDescription: response.data.description
                             });
                         }
                     }
@@ -174,26 +196,41 @@ const paymentRedirect = async (req, res) => {
                     paymentType: data.payment_type,
                     paymentDate: new Date(Date.now()),
                     paymentSource: 'redirect',
-                    paymentAmount: response.data.transaction_amount || 0
+                    paymentAmount: response.data.transaction_amount || 0,
+                    paymentDescription: response.data.description || "-"
                 });
             }
+            //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
+            let selectedPlan = await Plans.findOne({description: response.data.description});
+            console.log(selectedPlan)
+            if (!selectedPlan) {
+                console.log('Error en el filtrado del plan.');
+                selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
+                console.log(selectedPlan)
+            }
+            const userPurchases = [...user.premiumPurchases];
+            userPurchases.push(selectedPlan.name || "Compra premium");
+            const paidMonths = selectedPlan.months || 1
             //Verifico si ya es usuario premium o no
             let nextExpiryDate = null;
             //Si es premium uso la fecha de vencimiento y le agrego un mes
             if (user.premium === true) {
                 const expiryDate = new Date(user.premiumExpiration);
-                nextExpiryDate = add(expiryDate, { months: 1 });
+                nextExpiryDate = add(expiryDate, { months: paidMonths });
             } else {
                 //Si no es premium agrego un mes desde la fecha del pago
                 const currentDate = new Date(Date.now());
-                nextExpiryDate = add(currentDate, { months: 1 });
+                nextExpiryDate = add(currentDate, { months: paidMonths });
             }
+            
             //Actualizo el usuario
             await Users.updateOne({_id: data.external_reference},
                 {
                     $set: {
                         premium: true,
-                        premiumExpiration: new Date(nextExpiryDate)
+                        premiumExpiration: new Date(nextExpiryDate),
+                        premiumType: selectedPlan.type || 'None',
+                        premiumPurchases: userPurchases
                     }
                 }
             )
@@ -210,7 +247,7 @@ const paymentRedirect = async (req, res) => {
             }
             return res.status(200).send("Membresía premium activada");
         } else {
-            return res.status(403).send("payment status error");
+            return res.status(403).send("Payment status error");
         }
     } catch (error) {
         console.log(error)
