@@ -20,6 +20,14 @@ const plansSchema = new mongoose.Schema({
     type: {
         type: String,
         required: true
+    },
+    includes: {
+        type: [],
+        required: true
+    },
+    active: {
+        type: Boolean,
+        required: true
     }
 }, {versionKey: false});
 

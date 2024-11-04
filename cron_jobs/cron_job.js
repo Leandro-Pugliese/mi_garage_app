@@ -206,7 +206,8 @@ const removePremium = async (req, res) => {
                 await Users.updateOne({_id: users[i]._id},
                     {
                         $set: {
-                            premium: false
+                            premium: false,
+                            premiumType: "Default"
                         }
                     }
                 )
@@ -216,7 +217,7 @@ const removePremium = async (req, res) => {
                     subject: 'Membresía premium vencida',
                     html: ` <strong>¡Hola, este correo es para informarte que tu membresía premium venció!</strong>
                             <br><strong>Fecha de vencimiento: ${users[i].premiumExpiration.toLocaleDateString()}, puedes <a href="http://localhost:3000">INGRESAR A LA APP</a> y renovar tu membresía premium para seguir aprovenchando al máximo las funcionalidades de la app.</strong>
-                            <br><p>Si ya renovaste tu membresía premium o no te interesa tener una ignora este email.</p>
+                            <br><p>Si ya renovaste tu membresía premium o no te interesa tener una, ignora este email.</p>
                             <br><p>Si no estas registrado en "Mi Garage" ignora este email y avisa al staff de inmediato.</p>`,
                 });
                 if (error) {

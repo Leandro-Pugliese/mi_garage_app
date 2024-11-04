@@ -3,7 +3,7 @@ const Plans = require("../models/plans");
 
 const plansList = async (req, res) => {
     try {
-        const plans = await Plans.find();
+        const plans = await Plans.find({active: true});
         return res.status(200).send(plans);
     } catch (error) {
         console.log(error);
