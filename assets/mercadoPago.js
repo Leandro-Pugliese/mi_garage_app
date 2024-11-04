@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 const { add } = require('date-fns');
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND);
+const { isBefore, subDays, differenceInDays } = require('date-fns');
 
 const createPreference = async (req, res) => {
     const token = req.header("Authorization");
@@ -17,6 +18,23 @@ const createPreference = async (req, res) => {
     }
     const {_id} = jwt.decode(token, {complete: true}).payload
     const userId = _id
+    const user = await Users.findOne({_id: userId});
+    if (!user) {
+        return res.status(403).send('Usuario no encontrado, token inválido.');
+    }
+    // Si el usuario ya tiene premium y quiere renovar su plan, tiene que ser dentro de los 7 días anteriores a su vencimiento, antes no puede hacerlo.
+    if (user.premium) {
+        //La fecha de vencimiento tiene que estar dentro de los proximos 7 dias para qeu puedas renovar la membresia
+        const premiumExpirationDate = new Date(user.premiumExpiration);
+        const currentDate = new Date(Date.now());
+        // Resto 7 días a la fecha de vencimiento.
+        const checkDate = subDays(premiumExpirationDate, 7);
+        // Chequeo si no estoy a 7 días o menos de la fecha de vencimiento.
+        if (!(isBefore(currentDate, premiumExpirationDate) && !isBefore(currentDate, checkDate))) {
+            const daysRemaining = differenceInDays(premiumExpirationDate, currentDate);
+            return res.status(403).send(`Puedes renovar tu plan dentro de los 7 días previos a su vencimiento (días para el vencimiento de tu plan: ${daysRemaining}).`); 
+        }
+    }
     const { email, planName } = req.body; //Email, planName
     const selectedPlan = await Plans.findOne({name: planName});
     if (!selectedPlan) {
@@ -51,10 +69,10 @@ const createPreference = async (req, res) => {
     try {
         const response = await preference.create(data);
         const init_point = response.init_point || response.sandbox_init_point;
-        res.status(200).send({ init_point, response });
+        return res.status(200).send({ init_point, response });
     } catch (error) {
         console.error(error);
-        res.status(500).send({ error: 'Error al crear la preferencia de pago' });
+        return res.status(500).send({ error: 'Error al crear la preferencia de pago' });
     }
 }
 
@@ -115,7 +133,7 @@ const paymentNotification = async (req, res) => {
                                 $set: {
                                     premium: true,
                                     premiumExpiration: new Date(nextExpiryDate),
-                                    premiumType: selectedPlan.type || 'None',
+                                    premiumType: selectedPlan.type || 'Error',
                                     premiumPurchases: userPurchases
                                 }
                             }
@@ -139,7 +157,7 @@ const paymentNotification = async (req, res) => {
                 console.error('Error al obtener el pago:', error.response ? error.response.data : error.message);
             }
         }
-        // Respuesta  200 OK para que Mercado Pago sepa que recibi la notificación.
+        // Respuesta 200 OK para que Mercado Pago sepa que recibi la notificación.
         return res.status(200).send('OK');
     } catch (error) {
         console.error('Error al actualizar el usuario:', error);
@@ -153,7 +171,7 @@ const paymentRedirect = async (req, res) => {
         if (data.status === "approved") {
             const user = await Users.findOne({_id: data.external_reference});
             if (!user) {
-                return res.status(403).send("Usuario no encontrado en la base de datos, porfavor contactar soporte.");
+                return res.status(403).send("Usuario no encontrado en la base de datos, porfavor contacta a soporte con este código de error: UNE1");
             }
             const isPayment = await Payments.findOne({paymentId: data.payment_id});
             try {
@@ -178,15 +196,6 @@ const paymentRedirect = async (req, res) => {
                 //Si hay un pago y ya fue redireccionado, lo freno
                 if (isPayment.paymentSource === 'redirect') {
                     return res.status(403).send("Este id de pago ya fue utilizado.");
-                } else {
-                    //Si hay un pago pero fue creado por la notificacion de MP solo lo updeteo por si lo vuelven a usar
-                    await Payments.updateOne({paymentId: data.payment_id},
-                        {
-                            $set: {
-                                paymentSource: 'redirect'
-                            }
-                        }
-                    )
                 }
             } else {
                 //Si no hubo pago registrado todavia por notificacion de MP, creo el pago.
@@ -197,16 +206,14 @@ const paymentRedirect = async (req, res) => {
                     paymentDate: new Date(Date.now()),
                     paymentSource: 'redirect',
                     paymentAmount: response.data.transaction_amount || 0,
-                    paymentDescription: response.data.description || "-"
+                    paymentDescription: response.data.description || "error"
                 });
             }
             //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
             let selectedPlan = await Plans.findOne({description: response.data.description});
-            console.log(selectedPlan)
             if (!selectedPlan) {
                 console.log('Error en el filtrado del plan.');
                 selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
-                console.log(selectedPlan)
             }
             const userPurchases = [...user.premiumPurchases];
             userPurchases.push(selectedPlan.name || "Compra premium");
@@ -222,18 +229,19 @@ const paymentRedirect = async (req, res) => {
                 const currentDate = new Date(Date.now());
                 nextExpiryDate = add(currentDate, { months: paidMonths });
             }
-            
-            //Actualizo el usuario
-            await Users.updateOne({_id: data.external_reference},
-                {
-                    $set: {
-                        premium: true,
-                        premiumExpiration: new Date(nextExpiryDate),
-                        premiumType: selectedPlan.type || 'None',
-                        premiumPurchases: userPurchases
+            //Actualizo el usuario si no fue modificado con el webhook
+            if (expiryDate !== nextExpiryDate) { //Chequeo si la fecha es la misma que me da actualizando al usuario quiere decir que ya fue actualizado
+                await Users.updateOne({_id: data.external_reference},
+                    {
+                        $set: {
+                            premium: true,
+                            premiumExpiration: new Date(nextExpiryDate),
+                            premiumType: selectedPlan.type || 'Error',
+                            premiumPurchases: userPurchases
+                        }
                     }
-                }
-            )
+                )
+            }
             const { error } = await resend.emails.send({
                 from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
                 to: [user.email],
@@ -250,8 +258,8 @@ const paymentRedirect = async (req, res) => {
             return res.status(403).send("Payment status error");
         }
     } catch (error) {
-        console.log(error)
-        return res.status(500).send("Error al obtener información del pago");
+        console.log(error);
+        return res.status(500).send("Error al obtener información del pago, porfavor contacta a soporte.");
     }
 }
 module.exports = {createPreference, paymentNotification, paymentRedirect}

@@ -68,7 +68,6 @@ const checkPremium = async (req, res) => {
         }
         for (let i=0; i < users.length; i++) {
             if (users[i].premium === true && users[i].verify === true) {
-                //Chequeo cuando fue modificado el kilometraje de cada vehículo.
                 const premiumExpirationDate = new Date(users[i].premiumExpiration);
                 const currentDate = new Date(Date.now());
                 // Resto 7 días a la fecha de vencimiento.
