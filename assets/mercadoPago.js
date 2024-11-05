@@ -12,6 +12,7 @@ const resend = new Resend(process.env.RESEND);
 const { isBefore, subDays, differenceInDays } = require('date-fns');
 
 const createPreference = async (req, res) => {
+    const { email, planName, upgrade } = req.body;
     const token = req.header("Authorization");
     if (!token) {
         return res.status(403).send('No se detecto un token en la petición.');
@@ -23,7 +24,7 @@ const createPreference = async (req, res) => {
         return res.status(403).send('Usuario no encontrado, token inválido.');
     }
     // Si el usuario ya tiene premium y quiere renovar su plan, tiene que ser dentro de los 7 días anteriores a su vencimiento, antes no puede hacerlo.
-    if (user.premium) {
+    if (user.premium && !upgrade) {
         //La fecha de vencimiento tiene que estar dentro de los proximos 7 dias para qeu puedas renovar la membresia
         const premiumExpirationDate = new Date(user.premiumExpiration);
         const currentDate = new Date(Date.now());
@@ -35,7 +36,6 @@ const createPreference = async (req, res) => {
             return res.status(403).send(`Puedes renovar tu plan dentro de los 7 días previos a su vencimiento (días para el vencimiento de tu plan: ${daysRemaining}).`); 
         }
     }
-    const { email, planName } = req.body; //Email, planName
     const selectedPlan = await Plans.findOne({name: planName});
     if (!selectedPlan) {
         return res.status(403).send('El plan seleccionado no esta disponible.');
@@ -43,14 +43,38 @@ const createPreference = async (req, res) => {
     if (!selectedPlan.description || !selectedPlan.amount) {
         return res.status(403).send('El plan seleccionado no tiene descripción o monto asignados.');
     }
+    let planAmount = selectedPlan.amount;
+    let planDescription = selectedPlan.description;
+    // Upgrade de plan
+    if (user.premium && upgrade) {
+        //Calculo lso dias restantes del plan actual
+        const upgradeDays = differenceInDays(premiumExpirationDate, currentDate);
+        console.log(upgradeDays, typeof upgradeDays);
+        if (upgradeDays <= 0) {
+            return res.status(403).send('No te quedan días restantes para mejorar tu plan, puedes contratar el plan qeu desees.');
+        }
+        const currentPlan = await Plans.findOne({type: user.premiumType});
+        if (!currentPlan) {
+            return res.status(403).send('No es posible hacer el upgrade, ya que tu plan actual no esta disponible al dia de hoy, tienes que esperar el vencimiento para contratar el plan que desees.');
+        }
+        // Calculo el credito que le queda al usuario de su plan actual, y lo resto al nuevo plan
+        const costPerDay =  currentPlan.amount / 30;
+        const remainingCredit = costPerDay * upgradeDays; 
+        const remainingAmount = planAmount - remainingCredit 
+        //Sumo el monto restante del upgrade al percio de otro mes completo de premium.
+        planAmount = selectedPlan.amount + remainingAmount;
+        // Agrego string para identificar que es un upgrade
+        const upgradeText = ' + upgrade plan Basic a Plus';
+        planDescription = selectedPlan.description + upgradeText;
+    }
     const preference = new mercadopago.Preference(new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA }))
     const data = {
         body: {
             items: [
                 {
-                    title: selectedPlan.description,
+                    title: planDescription,
                     quantity: 1,
-                    unit_price: selectedPlan.amount
+                    unit_price: planAmount
                 },
             ],
             payer: {
@@ -105,13 +129,17 @@ const paymentNotification = async (req, res) => {
                     console.log('userId: ', userId);
                     const user = await Users.findOne({_id: userId});
                     if (user) {
-                        //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
-                        let selectedPlan = await Plans.findOne({description: response.data.description});
+                        let mainDescription = response.data.description
+                        //si es pago de upgrade, separo la parte del string de descripcion que dice el upgrade para poder buscar el plan
+                        if (response.data.description.includes('+')) {
+                            const description = response.data.description;
+                            mainDescription = description.split(' +')[0].trim(); //.trim() elimina cualquier espacio en blanco extra al final de la primera parte. 
+                        }
+                        //Filtro el plan seleccionado por la descripcion para obtener la info.
+                        let selectedPlan = await Plans.findOne({description: mainDescription});
                         console.log(selectedPlan);
                         if (!selectedPlan.length) {
                             console.log('Error en el filtrado del plan.');
-                            selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
-                            console.log(selectedPlan);
                         }
                         const userPurchases = [...user.premiumPurchases];
                         userPurchases.push(selectedPlan.name || "Compra premium");
@@ -209,11 +237,16 @@ const paymentRedirect = async (req, res) => {
                     paymentDescription: response.data.description || "error"
                 });
             }
-            //Filtro el plan seleccionado por la descripcion para obtener la info (tambien puedo usar el amount)
-            let selectedPlan = await Plans.findOne({description: response.data.description});
+            //Filtro el plan seleccionado por la descripcion para obtener la info
+            let mainDescription = response.data.description
+            //si es pago de upgrade, separo la parte del string de descripcion que dice el upgrade para poder buscar el plan
+            if (response.data.description.includes('+')) {
+                const description = response.data.description;
+                mainDescription = description.split(' +')[0].trim(); //.trim() elimina cualquier espacio en blanco extra al final de la primera parte. 
+            }
+            let selectedPlan = await Plans.findOne({description: mainDescription});
             if (!selectedPlan) {
                 console.log('Error en el filtrado del plan.');
-                selectedPlan = await Plans.findOne({amount: response.data.transaction_amount});
             }
             const userPurchases = [...user.premiumPurchases];
             userPurchases.push(selectedPlan.name || "Compra premium");
@@ -262,4 +295,5 @@ const paymentRedirect = async (req, res) => {
         return res.status(500).send("Error al obtener información del pago, porfavor contacta a soporte.");
     }
 }
+
 module.exports = {createPreference, paymentNotification, paymentRedirect}
