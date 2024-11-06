@@ -3,6 +3,7 @@ const { MercadoPagoConfig } = require("mercadopago");
 require("dotenv").config();
 const axios = require('axios');
 const Users = require("../models/User");
+const Vehicles = require('../models/Vehicle');
 const Payments = require("../models/Payments");
 const Plans = require('../models/plans');
 const jwt = require("jsonwebtoken");
@@ -166,6 +167,15 @@ const paymentNotification = async (req, res) => {
                                 }
                             }
                         )
+                        //Veo cuantos vehículos activar según el plan abonado
+                        const maxActiveVehicles = user.premiumType === 'Basic' ? 3 : user.vehicles.length;
+                        // Activo los vehículos 
+                        await Promise.all(
+                            user.vehicles.map((vehicle, index) => {
+                                const isActive = index < maxActiveVehicles; // Activo según el límite del plan
+                                return Vehicles.findByIdAndUpdate(vehicle, { active: isActive });
+                            })
+                        );
                         //Creo el payment 
                         const isPayment = await Payments.findOne({paymentId: response.data.id})
                         if (!isPayment) {
@@ -274,6 +284,15 @@ const paymentRedirect = async (req, res) => {
                         }
                     }
                 )
+                //Veo cuantos vehículos activar según el plan abonado
+                const maxActiveVehicles = user.premiumType === 'Basic' ? 3 : user.vehicles.length;
+                // Activo los vehículos 
+                await Promise.all(
+                    user.vehicles.map((vehicle, index) => {
+                        const isActive = index < maxActiveVehicles; // Activo según el límite del plan
+                        return Vehicles.findByIdAndUpdate(vehicle, { active: isActive });
+                    })
+                );
             }
             const { error } = await resend.emails.send({
                 from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',

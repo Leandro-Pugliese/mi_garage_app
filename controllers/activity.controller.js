@@ -126,12 +126,29 @@ const createActivityPremium = async (req, res) => {
         // Si no se carga imagen lo dejo vacio.
         let imageUrl = "";
         let imageId = "";
+        let imageSizeMB = 0;
+        let MAX_STORAGE_LIMIT_MB = 0;
+        if (user.premiumType === 'Basic') {
+            MAX_STORAGE_LIMIT_MB = 500;
+        } 
+        if (user.premiumType === 'Plus') {
+            MAX_STORAGE_LIMIT_MB = 2000;
+        }
         // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary.
         if (req.file !== undefined) {
+            imageSizeMB = req.file.size / (1024 * 1024); // Convierto de bytes a MB
+            // Verifico si el tamaño total excede el límite del usuario
+            const newTotalStorage = (user.totalStorage || 0) + imageSizeMB;
+            if (newTotalStorage > MAX_STORAGE_LIMIT_MB) {
+                return res.status(403).send("Límite de almacenamiento excedido.");
+            }
             const image = req.file.buffer;
             const uploadedImage = await uploadToCloudinary(image);
             imageUrl = uploadedImage.secure_url; // URL de la imagen.
             imageId = uploadedImage.public_id; // ID de la imagen.
+
+            // Actualizo el almacenamiento total del usuario
+            await Users.updateOne({ _id: user._id }, { totalStorage: newTotalStorage });
         }
         const activity = await Activities.create({
             user: user._id.toString(),
@@ -163,8 +180,7 @@ const createActivityPremium = async (req, res) => {
         await Vehicles.updateOne({_id: vehicle._id},
             {
                 $set: {
-                    activities: vehicleActivities,
-                    updated: new Date(Date.now())
+                    activities: vehicleActivities
                 }
             }
         )
@@ -253,6 +269,15 @@ const updateActivityPremium = async (req, res) => {
     const {id} = req.params;
     const {body} = req; //type, description, km, date, isNextDate, nextDate, isNextKm, nextkm, active, deleteImage.
     try {
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {_id} = jwt.decode(token, {complete: true}).payload
+        const user = await Users.findOne({_id: _id});
+        if (!user) {
+            return res.status(403).send("Usuario no encontrado, token inválido.");
+        }
         const activity = await Activities.findOne({_id: id});
         if (!activity) {
             return res.status(403).send("Actividad no encontrada en la base de datos.");
@@ -287,12 +312,29 @@ const updateActivityPremium = async (req, res) => {
             // Si no se carga imagen lo dejo vacio.
             let imageUrl = null;
             let imageId = null;
+            let imageSizeMB = 0;
+            let MAX_STORAGE_LIMIT_MB = 0;
+            if (user.premiumType === 'Basic') {
+                MAX_STORAGE_LIMIT_MB = 500;
+            } 
+            if (user.premiumType === 'Plus') {
+                MAX_STORAGE_LIMIT_MB = 2000;
+            }
             // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary
             if (req.file !== undefined) {
+                imageSizeMB = req.file.size / (1024 * 1024); // Convierto de bytes a MB
+                // Verifico si el tamaño total excede el límite del usuario
+                const newTotalStorage = (user.totalStorage || 0) + imageSizeMB;
+                if (newTotalStorage > MAX_STORAGE_LIMIT_MB) {
+                    return res.status(403).send("Límite de almacenamiento excedido.");
+                }
                 const image = req.file.buffer;
                 const uploadedImage = await uploadToCloudinary(image);
                 imageUrl = uploadedImage.secure_url; // URL de la imagen
                 imageId = uploadedImage.public_id; // ID de la imagen
+
+                // Actualizo el almacenamiento total del usuario
+                await Users.updateOne({ _id: user._id }, { totalStorage: newTotalStorage });
             }
             await Activities.updateOne({_id: activity._id},
                 {

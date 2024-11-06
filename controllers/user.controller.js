@@ -36,7 +36,7 @@ const createUser = async (req, res) => {
                 amount: 2,
                 sent: false
             },
-            imageIterations: 50,
+            totalStorage: 0,
             emailIterations: 5,
             entries: 0,
             lastConection: new Date(Date.now()),

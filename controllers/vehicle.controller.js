@@ -49,7 +49,7 @@ const createVehicle = async (req, res) => {
             updated: new Date(Date.now()),
             updatedKm: new Date(Date.now()),
             oldOwners: [],
-            blocked: false
+            active: true
         })
         //Agregamos el vehículo a la lista del usuario.
         vehiculosUsuario.push(vehicle._id.toString());

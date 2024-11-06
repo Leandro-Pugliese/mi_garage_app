@@ -222,6 +222,15 @@ const removePremium = async (req, res) => {
                 if (error) {
                     console.log(error);
                 }
+                //Bloqueo de vehículos
+                const userVehicles = users[i].vehicles;
+                // Recorro los vehículos y bloqueo todos menos el primero
+                await Promise.all(
+                    userVehicles.map((vehicleId, index) => {
+                        const isActive = index === 0; // Activo solo el primer vehículo
+                        return Vehicles.findByIdAndUpdate(vehicleId, { active: isActive });
+                    })
+                );
             }
         }
     } catch (error) {

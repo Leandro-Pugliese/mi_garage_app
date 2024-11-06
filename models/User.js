@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema({
         type: {},
         required: true
     },
-    imageIterations: {
+    totalStorage: {
         type: Number,
         required: true
     },

@@ -65,7 +65,7 @@ const vehicleSchema = new mongoose.Schema({
         type: [],
         required: true
     },
-    blocked: {
+    active: {
         type: Boolean, 
         required: true
     }
