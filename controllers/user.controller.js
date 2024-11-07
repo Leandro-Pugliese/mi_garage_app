@@ -37,7 +37,7 @@ const createUser = async (req, res) => {
                 sent: false
             },
             totalStorage: 0,
-            emailIterations: 5,
+            emailIterations: 3,
             entries: 0,
             lastConection: new Date(Date.now()),
             country: country || "-",

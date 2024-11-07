@@ -71,6 +71,10 @@ const vehicleSchema = new mongoose.Schema({
     }
 }, {versionKey: false});
 
+// Agrego indices para mejorar eficiencia en las consultas
+vehicleSchema.index({ user: 1 });
+vehicleSchema.index({ active: 1 });
+
 const Vehicle = mongoose.model("Vehicle", vehicleSchema);
 
 module.exports = Vehicle;

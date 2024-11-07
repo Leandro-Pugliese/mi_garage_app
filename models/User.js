@@ -88,6 +88,10 @@ const userSchema = new mongoose.Schema({
     }
 }, {versionKey: false});
 
+// indices
+userSchema.index({ premium: 1 });
+userSchema.index({ verify: 1 });
+
 const User = mongoose.model("User", userSchema);
 
 module.exports = User;

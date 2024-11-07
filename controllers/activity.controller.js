@@ -47,7 +47,7 @@ const createActivity = async (req, res) => {
             },
             active: true,
             notices: {
-                cantidad: 0,
+                quantity: 0,
                 lastNotice: null
             }
         })
@@ -171,7 +171,7 @@ const createActivityPremium = async (req, res) => {
             },
             active: true,
             notices: {
-                cantidad: 0,
+                quantity: 0,
                 lastNotice: null
             }
         })

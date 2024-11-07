@@ -47,6 +47,11 @@ const activitySchema = new mongoose.Schema({
     }
 }, {versionKey: false});
 
+// Indices
+activitySchema.index({ user: 1 });
+activitySchema.index({ vehicle: 1 });
+activitySchema.index({ active: 1 });
+
 const Activitie = mongoose.model("Activitie", activitySchema);
 
 module.exports = Activitie;
