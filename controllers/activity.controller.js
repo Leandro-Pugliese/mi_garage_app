@@ -51,13 +51,10 @@ const createActivity = async (req, res) => {
                 lastNotice: null
             }
         })
-        const vehicleActivities = [...vehicle.activities];
-        vehicleActivities.push(activity._id.toString());
         await Vehicles.updateOne({_id: vehicle._id},
             {
-                $set: {
-                    activities: vehicleActivities,
-                    updated: new Date(Date.now())
+                $push: {
+                    activities: activity._id.toString()
                 }
             }
         )
@@ -175,12 +172,10 @@ const createActivityPremium = async (req, res) => {
                 lastNotice: null
             }
         })
-        const vehicleActivities = [...vehicle.activities];
-        vehicleActivities.push(activity._id.toString());
         await Vehicles.updateOne({_id: vehicle._id},
             {
-                $set: {
-                    activities: vehicleActivities
+                $push: {
+                    activities: activity._id.toString()
                 }
             }
         )
@@ -434,14 +429,11 @@ const deleteActivity = async (req, res) => {
         }
         //Elimino la actividad.
         await Activities.deleteOne({_id: activity._id});
-        //Quito la actividad del vehiculo.
-        const vehicleActivities = [...vehicle.activities];
-        const activitiesFilter = vehicleActivities.filter((element) => element !== activity._id.toString());
+        //Quito la actividad de la lista de acividades dle vehiculo
         await Vehicles.updateOne({_id: vehicle._id},
             {
-                $set: {
-                    activities: activitiesFilter,
-                    updated: new Date(Date.now())
+                $pull: {
+                    activities: activity._id.toString()
                 }
             }
         )

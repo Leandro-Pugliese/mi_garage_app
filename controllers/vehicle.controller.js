@@ -253,7 +253,6 @@ const sendTransferVehicle = async (req, res) => {
             status: 'Active',
             updated: new Date(Date.now())
         })
-        let userNotifications = [...user.notifications];
         const newNotification = {
             id: uuidv4(),
             title: 'Transferencia de vehículo',
@@ -261,21 +260,19 @@ const sendTransferVehicle = async (req, res) => {
             date: new Date(Date.now()),
             read: false
         }
-        userNotifications.push(newNotification)
         //Hago update del usuario con la nueva notificacion y las iteraciones actualizadas
         await Users.updateOne({_id: user._id},
             {
+                $push: { 
+                    notifications: newNotification 
+                },
                 $set: {
-                    notifications: userNotifications,
-                    transferIterarions: {
-                        amount: user.transferIterarions.amount - 1,
-                        sent: true
-                    },
+                    'transferIterations.amount': user.transferIterarions.amount - 1,
+                    'transferIterations.sent': true
                 }
             }
         )
         //Creo notificacion para el otro usuario y hago el update tambien
-        let newOwnerNotifications = [...newOwner.notifications];
         const newNotification2 = {
             id: uuidv4(),
             title: 'Transferencia de vehículo',
@@ -283,11 +280,10 @@ const sendTransferVehicle = async (req, res) => {
             date: new Date(Date.now()),
             read: false
         }
-        newOwnerNotifications.push(newNotification2);
         await Users.updateOne({_id: newOwner._id},
             {
-                $set: {
-                    notifications: newOwnerNotifications
+                $push: {
+                    notifications: newNotification2
                 }
             }
         )
@@ -330,17 +326,8 @@ const acceptTransferVehicle = async (req, res) => {
         if ((newOwner.vehicles.length >= 3) && (newOwner.premiumType === 'Basic')) {
             return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan premium Basic a premium Plus para agegar más vehículos.');
         }
-        let oldOwnerNotifications = [...oldOwner.notifications];
-        let newOwnerNotifications = [...newOwner.notifications];
         if (accepted === true) {
-            //Modifico oldOwner
-            //Quito vehiculo de la lista
-            const oldOwnerVehicles = [...oldOwner.vehicles];
-            const oldOwnerVehiclesFilter = oldOwnerVehicles.filter((element) => element !== vehicle._id.toString());
-            //Agregarlo a la lista de ex-vehiculos
-            let oldOwnerOldVehicles = [...oldOwner.transferredVehicles];
-            oldOwnerOldVehicles.push(vehicle._id.toString());
-            //Envio notificacion y correo con info de la trasferencia
+            //Envio notificacion y correo con info de la trasferencia a oldOwner
             const newNotification = {
                 id: uuidv4(),
                 title: 'Transferencia de vehículo',
@@ -348,12 +335,7 @@ const acceptTransferVehicle = async (req, res) => {
                 date: new Date(Date.now()),
                 read: false
             }
-            oldOwnerNotifications.push(newNotification);
-            //Modificar newOwner
-            //Agregar vehiculo en lista vehiculos
-            let newOwnerVehicles = [...newOwner.vehicles];
-            newOwnerVehicles.push(vehicle._id.toString());
-            //Enviar notificacion con info de la transferencia.
+            //Envio notificacion con info de la transferencia a newOwner
             const newNotification2 = {
                 id: uuidv4(),
                 title: 'Transferencia de vehículo',
@@ -361,14 +343,13 @@ const acceptTransferVehicle = async (req, res) => {
                 date: new Date(Date.now()),
                 read: false
             }
-            newOwnerNotifications.push(newNotification2);
             //Modifico el vehiculo
-            let oldOwnersVehicle = [...vehicle.oldOwners];
-            oldOwnersVehicle.push(transfer.oldOwner)
             await Vehicles.updateOne({_id: vehicle._id},{
+                $push: {
+                    oldOwners: transfer.oldOwner
+                },
                 $set: {
-                    user: newOwner._id.toString(),
-                    oldOwners: oldOwnersVehicle
+                    user: newOwner._id.toString()
                 }
             });
             //Modifico las actividades del vehiculo
@@ -386,16 +367,18 @@ const acceptTransferVehicle = async (req, res) => {
             });
             //Hago updates de los usuarios
             await Users.updateOne({_id: oldOwner._id},{
-                $set: {
-                    vehicles: oldOwnerVehiclesFilter,
-                    transferredVehicles: oldOwnerOldVehicles,
-                    notifications: oldOwnerNotifications
+                $push: {
+                    transferredVehicles: vehicle._id.toString(),
+                    notifications: newNotification
+                },
+                $pull: {
+                    vehicles: vehicle._id.toString()
                 }
             });
             await Users.updateOne({_id: newOwner._id},{
-                $set: {
-                    vehicles: newOwnerVehicles,
-                    notifications: newOwnerNotifications
+                $push: {
+                    vehicles: vehicle._id.toString(),
+                    notifications: newNotification2
                 }
             });
             //Si todo se actualizo ok, envio los emails a los usuarios
@@ -431,10 +414,9 @@ const acceptTransferVehicle = async (req, res) => {
                 date: new Date(Date.now()),
                 read: false
             }
-            oldOwnerNotifications.push(newNotification);
             await Users.updateOne({_id: oldOwner._id},{
-                $set: {
-                    notifications: oldOwnerNotifications
+                $push: {
+                    notifications: newNotification
                 }
             });
             const newNotification2 = {
@@ -444,10 +426,9 @@ const acceptTransferVehicle = async (req, res) => {
                 date: new Date(Date.now()),
                 read: false
             }
-            newOwnerNotifications.push(newNotification2);
             await Users.updateOne({_id: newOwner._id},{
-                $set: {
-                    notifications: newOwnerNotifications
+                $push: {
+                    notifications: newNotification2
                 }
             });
             //Modifico el status de la transferencia
@@ -501,7 +482,6 @@ const cancelTransferVehicle = async (req, res) => {
             return res.status(403).send('La transferencia ya fue realizada, no puedes cancelarla.');
         }
         await Transfers.deleteOne({id: body.transferId});
-        let userNotifications = [...user.notifications];
         const newNotification = {
             id: uuidv4(),
             title: 'Transferencia de vehículo',
@@ -509,15 +489,13 @@ const cancelTransferVehicle = async (req, res) => {
             date: new Date(Date.now()),
             read: false
         }
-        userNotifications.push(newNotification);
         await Users.updateOne({_id: user._id},{
-            $set: {
-                notifications: userNotifications
+            $push: {
+                notifications:newNotification
             }
         });
         const userOther = await Users.findOne({email: transfer.newOwner});
         if (userOther) {
-            let otherNotifications = [...userOther.notifications];
             const newOtherNotification = {
                 id: uuidv4(),
                 title: 'Transferencia de vehículo',
@@ -525,10 +503,9 @@ const cancelTransferVehicle = async (req, res) => {
                 date: new Date(Date.now()),
                 read: false
             }
-            otherNotifications.push(newOtherNotification);
             await Users.updateOne({_id: userOther._id},{
-                $set: {
-                    notifications: otherNotifications
+                $push: {
+                    notifications: newOtherNotification
                 }
             })
             const { error } = await resend.emails.send({

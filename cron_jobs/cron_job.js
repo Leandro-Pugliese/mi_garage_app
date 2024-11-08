@@ -91,7 +91,7 @@ const checkPremium = async () => {
     }
 }
 
-const checkActivity = async (req, res) => {
+const checkActivity = async () => {
     try {
         const users = await Users.find({verify: true});
         if (users.length === 0) {
@@ -105,109 +105,123 @@ const checkActivity = async (req, res) => {
         if (activities.length === 0) {
             return
         }
+        let activitiesToUpdate = [];
         for (let i=0; i < users.length; i++) {
             const activitiesList = activities.filter((activity) => activity.user === users[i]._id.toString());
             for (let x = 0; x < activitiesList.length; x++) {
-                    const noticesNumber = activitiesList[x].notices.quantity;
-                    const noticesDate = new Date(activitiesList[x].notices.lastNotice) || new Date(Date.now());
-                    const currentDate = new Date(Date.now());
-                    const DiffAviso = differenceInDays(noticesDate, currentDate);
-                    if ((noticesNumber <= 3) && (DiffAviso >= 2)) {
-                        //Filtro el vehiculo al cual pertenece la actividad.
-                        const vehicle = vehicles.filter((vehicle) => vehicle._id === activitiesList[x].vehicle);
-                        if (vehicle.length === 0) {
-                            return
-                        }
-                        //Cargo los datos del vehículo y la actividad.
-                        let vehicleKm = null;
-                        let expiryKm = null;
-                        if (activitiesList[x].nextKm.tiene === true) {
-                            vehicleKm = vehicle[0].km || null;
-                            expiryKm = activitiesList[x].nextKm.km;
-                        }
-                        let expiryDate = null;
-                        if (activitiesList[x].nextDate.tiene === true) {
-                            expiryDate = activitiesList[x].nextDate.date
-                        }
-                        //Seteo el margen para kilómetros y fechas.
-                        const kmMargin = 1000;
-                        const daysMargin = 7;
-                        // Chequeo de kilómetros
-                        let kmAlert = false;
-                        if (expiryKm && vehicleKm) {
-                            kmAlert = vehicleKm >= (expiryKm - kmMargin);
-                        }
-                        // Chequeo de fecha
-                        let dateAlert = false;
-                        if (expiryDate) {
-                            const daysDiff = differenceInDays(expiryDate, currentDate);
-                            dateAlert = daysDiff <= daysMargin;
-                        }
-                        let msjHtml = null;
-                        if (kmAlert && dateAlert) {
-                            msjHtml = `<strong>La actividad: ${activitiesList[x].type} (${activitiesList[x].description}) debe realizarse pronto. 
+                const noticesNumber = activitiesList[x].notices.quantity;
+                const noticesDate = new Date(activitiesList[x].notices.lastNotice) || new Date(Date.now());
+                const currentDate = new Date(Date.now());
+                const DiffAviso = differenceInDays(noticesDate, currentDate);
+                if ((noticesNumber <= 3) && (DiffAviso >= 2)) {
+                    //Filtro el vehiculo al cual pertenece la actividad.
+                    const vehicle = vehicles.filter((vehicle) => vehicle._id === activitiesList[x].vehicle);
+                    if (vehicle.length === 0) {
+                        return
+                    }
+                    //Cargo los datos del vehículo y la actividad.
+                    let vehicleKm = null;
+                    let expiryKm = null;
+                    if (activitiesList[x].nextKm.tiene === true) {
+                        vehicleKm = vehicle[0].km || null;
+                        expiryKm = activitiesList[x].nextKm.km;
+                    }
+                    let expiryDate = null;
+                    if (activitiesList[x].nextDate.tiene === true) {
+                        expiryDate = activitiesList[x].nextDate.date
+                    }
+                    //Seteo el margen para kilómetros y fechas.
+                    const kmMargin = 1000;
+                    const daysMargin = 7;
+                    // Chequeo de kilómetros
+                    let kmAlert = false;
+                    if (expiryKm && vehicleKm) {
+                        kmAlert = vehicleKm >= (expiryKm - kmMargin);
+                    }
+                    // Chequeo de fecha
+                    let dateAlert = false;
+                    if (expiryDate) {
+                        const daysDiff = differenceInDays(expiryDate, currentDate);
+                        dateAlert = daysDiff <= daysMargin;
+                    }
+                    let msjHtml = null;
+                    if (kmAlert && dateAlert) {
+                        msjHtml = `<strong>La actividad: ${activitiesList[x].type} (${activitiesList[x].description}) debe realizarse pronto. 
                                         Debes realizarla cuando el vehículo alcance los ${expiryKm}km o antes del ${expiryDate.toLocaleDateString()} (Tu vehíclo tiene ${vehicleKm}km).</strong>
                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.</p>`;
-                        } else if (kmAlert) {
-                            msjHtml = `<strong>La actividad: ${activitiesList[x].type} (${activitiesList[x].description}) debe realizarse pronto. 
+                    } else if (kmAlert) {
+                        msjHtml = `<strong>La actividad: ${activitiesList[x].type} (${activitiesList[x].description}) debe realizarse pronto. 
                                         Debes realizarla cuando el vehículo alcance los ${expiryKm}km (Tu vehíclo tiene ${vehicleKm}km).</strong>
                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.<p/>`;
-                        } else if (dateAlert) {
-                            msjHtml = `<strong>La actividad: ${activitiesList[x].type} (${activitiesList[x].description}) debe realizarse pronto. 
+                    } else if (dateAlert) {
+                        msjHtml = `<strong>La actividad: ${activitiesList[x].type} (${activitiesList[x].description}) debe realizarse pronto. 
                                         Debes realizarla antes del ${expiryDate.toLocaleDateString()}.</strong>
                                         <br/><p>Si ya realizaste la actividad en tu vehiculo, te pedimos que actualices su estado <a href="http://localhost:3000">INGRESANDO A LA APP</a> para no recibir más esta alerta.<p/>`;
+                    }
+                    if (msjHtml) {
+                        //Envio el correo.
+                        const { error } = await resend.emails.send({
+                            from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
+                            to: [users[i].email],
+                            subject: `Realizar ${activitiesList[x].type} al vehículo Dominio: ${vehicle[0].patente}`,
+                            html: msjHtml,
+                        });
+                        if (error) {
+                            console.log(error);
                         }
-                        if (msjHtml) {
-                            //Envio el correo.
-                            const { error } = await resend.emails.send({
-                                from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
-                                to: [users[i].email],
-                                subject: `Realizar ${activitiesList[x].type} al vehículo Dominio: ${vehicle[0].patente}`,
-                                html: msjHtml,
-                            });
-                            if (error) {
-                                console.log(error);
-                            }
-                            if (!error) {
-                                await Activities.updateOne({ _id: activitiesList[x]._id },
-                                    {
-                                        $set: {
-                                            notices: {
-                                                quantity: noticesNumber + 1,
-                                                lastNotice: new Date(Date.now())
-                                            }
-                                        }
-                                    }
-                                )
-                            }
+                        if (!error) {
+                            activitiesToUpdate.push(activitiesList[x])
                         }
                     }
+                }
             }
-            
+        }
+        //Uso bulkWrite para poder hacer update en una sola llamada de la lista de actividades con datos variables para quantity
+        if (activitiesToUpdate.length > 0) {
+            const bulkOperations = activitiesToUpdate.map(activity => ({
+                updateOne: {
+                    filter: {_id: activity._id},
+                    update: { 
+                        $set: { 
+                            'notices.quantity': activity.notices.quantity + 1,
+                            'notices.lastNotice': new Date(Date.now())
+                        }
+                    }
+                }
+            }));
+            await Activities.bulkWrite(bulkOperations);
         }
     } catch (error) {
         return console.log(error.message);
     }
 }
 
-const removePremium = async (req, res) => {
+const removePremium = async () => {
     try {
+        const currentDate = new Date(Date.now());
+        const update = await Users.updateMany(
+            {
+                premium: true,
+                premiumExpiration: {$lt: currentDate}  //Condición para seleccionar usuarios con fecha vencida
+            },
+            {
+                $set: {
+                    premium: false,
+                    premiumType: "Default"
+                }
+            }
+        );
+        //Si ninguno cumple la condicion, no mando email a nadie, por lo tanto no hace falta que itere o busque en la base de datos.
+        if (update.nModified === 0) { 
+            return
+        }
         const users = await Users.find({premium: true});
         if (users.length === 0) {
             return
         }
-        const currentDate = new Date(Date.now());
         for (let i=0; i < users.length; i++) {
             const premiumExpiryDate = new Date(users[i].premiumExpiration);
             if (isBefore(premiumExpiryDate, currentDate)) {
-                await Users.updateOne({_id: users[i]._id},
-                    {
-                        $set: {
-                            premium: false,
-                            premiumType: "Default"
-                        }
-                    }
-                )
                 const { error } = await resend.emails.send({
                     from: 'Mi Garage <avisosMiGarage@leandro-pugliese.com>',
                     to: [users[i].email],
@@ -234,17 +248,33 @@ const removePremium = async (req, res) => {
     }
 }
 
+const cleanIterations = async () => {
+    try {
+        await Users.updateMany({verified: true},
+            { 
+                $set: { 
+                    emailIterations: 3,
+                    'transferIterarions.amount': 2,
+                    'transferIterations.sent': false 
+                } 
+            }
+        );
+    } catch (error) {
+        console.log(error.message);
+    }
+}
+
 //Cron-job para ejecutarse los miercoles y domingos a las 22hs.
 const cronJob = () => {
     schedule.scheduleJob({ hour: 22, minute: 0, dayOfWeek: [0, 3] }, () => {
-        console.log('Ejecutando tarea del miercoles y domingos a las 22:00hs');
+        console.log('Ejecutando tarea del miercoles y domingo a las 22:00hs');
         checkKm();
     })
 }
 //Cron-job para ejecutarse todos los días a la medianoche.
 const cronJob1 = () => {
-    schedule.scheduleJob({ hour: 0, minute: 0, dayOfWeek: [0, 1, 2, 3, 4, 5, 6] }, () => {
-        console.log('Ejecutando tarea todos los dias a la medianoche');
+    schedule.scheduleJob({ hour: 8, minute: 0, dayOfWeek: [1, 4] }, () => {
+        console.log('Ejecutando tarea del lunes y jueves a las 8am');
         checkPremium();
     })
 }
@@ -255,12 +285,19 @@ const cronJob2 = () => {
         checkActivity();
     })
 }
-//Cron-job para ejecutarse todos los días a las 4am.
+//Cron-job para ejecutarse todos los días a las 5:30am.
 const cronJob3 = () => { 
     schedule.scheduleJob({ hour: 5, minute: 30, dayOfWeek: [0, 1, 2, 3, 4, 5, 6] }, () => {
         console.log('Ejecutando tarea todos los dias a las 5:30am');
         removePremium();
     })
 }
+//Cron-job para ejecutarse el primer día del mes 4am.
+const cronJob4 = () => { 
+    schedule.scheduleJob({ hour: 4, minute: 0, date: 1 }, () => {
+        console.log('Ejecutando tarea el primer día de cada mes a las 4am');
+        cleanIterations();
+    });
+};
 
-module.exports = {cronJob, cronJob1, cronJob2, cronJob3}
+module.exports = {cronJob, cronJob1, cronJob2, cronJob3, cronJob4}

@@ -3,7 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 const { db } = require("./db/db");
 const Router = require('./routes/routes');
-const {cronJob, cronJob1, cronJob2, cronJob3} = require("./cron_jobs/cron_job");
+const {cronJob, cronJob1, cronJob2, cronJob3, cronJob4} = require("./cron_jobs/cron_job");
 //const {createPlans} = require('./controllers/plans.controller');
 
 const app = express();
@@ -17,6 +17,7 @@ cronJob();
 cronJob1();
 cronJob2();
 cronJob3();
+cronJob4();
 //createPlans();
 
 app.listen(process.env.PORT, () => console.log(`Server running at port: ${process.env.PORT}`));

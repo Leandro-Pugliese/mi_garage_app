@@ -21,8 +21,11 @@ const createUser = async (req, res) => {
         const salt = await bcrypt.genSalt();
         const hashed = await bcrypt.hash(password, salt);
         const user = await Users.create({
+            dni: 0, //Por el momento no voy a utilizar el dni y la validación.
+            validated: false,
             email: emailUser,
             verify: false,
+            twoFactorAuth: false,
             premium: false,
             premiumExpiration: new Date(Date.now()),
             premiumType: "Default",
@@ -43,6 +46,7 @@ const createUser = async (req, res) => {
             country: country || "-",
             province: province || "-",
             phone: phone || 0,
+            validatedPhone: false,
             password: hashed, salt
         })
         const token = signToken(user._id, user.email);

@@ -1,12 +1,24 @@
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
+    dni: {
+        type: Number,
+        required: true
+    },
+    validated: {
+        type: Boolean,
+        required: true
+    },
     email: {
         type: String,
         required: true,
         unique: true
     },
     verify: {
+        type: Boolean,
+        required: true
+    },
+    twoFactorAuth: {
         type: Boolean,
         required: true
     },
@@ -76,6 +88,10 @@ const userSchema = new mongoose.Schema({
     },
     phone: {
         type: Number,
+        required: true
+    },
+    validatedPhone: {
+        type: Boolean,
         required: true
     },
     password: {
