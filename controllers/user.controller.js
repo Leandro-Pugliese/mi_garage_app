@@ -51,7 +51,7 @@ const createUser = async (req, res) => {
         })
         const token = signToken(user._id, user.email);
         const msj = "Usuario creado exitosamente."
-        return res.status(200).send({token, user, msj});
+        return res.status(200).send({token, msj});
     } catch (error) {
         return res.status(500).send(error.message);
     }
@@ -91,9 +91,9 @@ const userData = async (req, res) => {
             return res.status(403).send('No se detecto un token en la petición.')
         }
         const {_id} = jwt.decode(token, {complete: true}).payload
-        const user = await Users.findOne({_id: _id});
+        const user = await Users.findOne({_id: _id}).select('-password -salt'); //Con .select puedo no traer datos sensibles como la password.
         if (!user) {
-            return res.status(403).send("Usuario no encontrado, token inválido.");
+            return res.status(404).send("Usuario no encontrado, token inválido.");
         }
         return res.status(200).send(user);
     } catch (error) {
