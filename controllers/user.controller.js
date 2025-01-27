@@ -35,10 +35,7 @@ const createUser = async (req, res) => {
             transferredVehicles: [],
             categories: ["MANTENIMIENTO", "SEGURO", "VERIFCACIÓN TÉCNICA", "PATENTE", "GNC", "OTROS"],
             notifications: [],
-            transferIterarions: {
-                amount: 2,
-                sent: false
-            },
+            transferIterations: 0,
             totalStorage: 0,
             emailIterations: 3,
             entries: 0,
@@ -51,7 +48,7 @@ const createUser = async (req, res) => {
         })
         const token = signToken(user._id, user.email);
         const msj = "Usuario creado exitosamente."
-        return res.status(200).send({token, msj});
+        return res.status(201).send({token, msj});
     } catch (error) {
         return res.status(500).send(error.message);
     }

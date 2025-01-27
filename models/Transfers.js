@@ -1,11 +1,6 @@
 const mongoose = require("mongoose");
 
 const transfersSchema = new mongoose.Schema({
-    uniqueCode: {
-        type: String,
-        required: true,
-        unique: true
-    },
     owner: {
         type: String,
         required: true

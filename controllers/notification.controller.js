@@ -1,43 +1,34 @@
 const express = require("express");
-const Users = require("../models/User");
-const jwt = require("jsonwebtoken");
+const Notifications = require('../models/Notifications');
 
 const readNotification = async (req, res) => {
+    const {id} = req.params; //Id de la notificacion leida.
     try {
-        const {id} = req.params;
-        const token = req.header("Authorization");
-        if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
-        }
-        const {_id} = jwt.decode(token, {complete: true}).payload
-        await Users.updateOne({_id: _id},
-            { 
-                $pull: { notifications: { id: id } } 
+        await Notifications.updateOne({_id: id},
+            {
+                $set: {
+                    read: true
+                }
             }
         );
-        return res.status(200).send('Notificación marcada como leida.')
+        return res.status(200).send('Notificación leida.');
     } catch (error) {
         return res.status(500).send(error.message);
     }
 }
 
 const deleteNotification = async (req, res) => {
+    const {notifications} = req.body; //Array con ids de notificaciones a eliminar.
     try {
-        const {id} = req.params;
-        const token = req.header("Authorization");
-        if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
+        if(notifications.length === 0) {
+            return res.status(400).send('No se enviaron ids de notificaciones para eliminar.');
         }
-        const {_id} = jwt.decode(token, {complete: true}).payload
-        const result = await Users.updateOne({_id: _id},
-            { 
-                $pull: { notifications: { id: id } } 
-            }
-        );
-        if (result.nModified === 0) { //Con esto me fijo si la notificacion se actualizo o si no actualizo nada
-            return res.status(404).send('Notificación no encontrada');
+        await Notifications.deleteMany({_id: {$in: notifications}});
+        if (notifications.length === 1) {
+            return res.status(200).send('Notificación eliminada.')
+        } else {
+            return res.status(200).send(`Se eliminaron ${notifications.length} notificacones.`)
         }
-        return res.status(200).send('Notificación eliminada')
     } catch (error) {
         return res.status(500).send(error.message);
     }

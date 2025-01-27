@@ -62,7 +62,7 @@ router.get('/plans', isAuthenticated, plansList);
 
 // Notifications routes
 router.put('/notification/read/:id', isAuthenticated, readNotification);
-router.delete('/notification/delete/:id', isAuthenticated, deleteNotification);
+router.delete('/notification/delete', isAuthenticated, deleteNotification);
 
 // Non-existent routes.
 router.get("*", (req, res) => {

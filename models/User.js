@@ -54,12 +54,8 @@ const userSchema = new mongoose.Schema({
         type: [],
         required: true
     },
-    notifications: {
-        type: [],
-        required: true
-    },
-    transferIterarions: {
-        type: {},
+    transferIterations: {
+        type: Number,
         required: true
     },
     totalStorage: {
