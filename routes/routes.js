@@ -9,7 +9,7 @@ const {uploadImagen} = require("../assets/multer");
 const {createPreference, paymentNotification, paymentRedirect} = require("../assets/mercadoPago");
 const {createReminder, reminderData, updateReminder, deleteReminder, remindersList} = require('../controllers/reminder.controller');
 const {plansList} = require('../controllers/plans.controller');
-const {readNotification, deleteNotification} = require('../controllers/notification.controller');
+const {readNotification, deleteNotification, getNotifications} = require('../controllers/notification.controller');
 
 // User routes.
 router.post("/user/create", createUser);
@@ -61,7 +61,8 @@ router.delete('/reminder/delete/:id', isPremium, deleteReminder);
 router.get('/plans', isAuthenticated, plansList);
 
 // Notifications routes
-router.put('/notification/read/:id', isAuthenticated, readNotification);
+router.get('/notifications', isAuthenticated, getNotifications);
+router.put('/notification/read', isAuthenticated, readNotification);
 router.delete('/notification/delete', isAuthenticated, deleteNotification);
 
 // Non-existent routes.

@@ -2,16 +2,24 @@ const express = require("express");
 const Notifications = require('../models/Notifications');
 
 const readNotification = async (req, res) => {
-    const {id} = req.params; //Id de la notificacion leida.
+    const {notificationsList} = req.body; //Array con IDs de las notificacines leidas.
     try {
-        await Notifications.updateOne({_id: id},
+        if (!Array.isArray(notificationsList) || notificationsList.length === 0) {
+            return res.status(400).send("Debe proporcionar una lista de notificaciones.");
+        }
+        await Notifications.updateMany({_id: {$in: notificationsList}},
             {
                 $set: {
                     read: true
                 }
             }
         );
-        return res.status(200).send('Notificación leida.');
+        if (result.modifiedCount === 0) {
+            return res.status(404).send("No se encontraron notificaciones para actualizar.");
+        }
+        return res.status(200).send(
+            notificationsList.length === 1 ? "Notificación leída." : "Notificaciones leídas."
+        );
     } catch (error) {
         return res.status(500).send(error.message);
     }
@@ -34,5 +42,16 @@ const deleteNotification = async (req, res) => {
     }
 }
 
+const getNotifications = async (req, res) => {
+    try {
+        //console.log(req.user)
+        const notifications = await Notifications.find({user: req.user._id})
+        .sort({date: -1})
+        //.limit(10); por ahora no las voy a limitar
+        return res.status(200).send(notifications)
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
 
-module.exports = {readNotification, deleteNotification}
+module.exports = {readNotification, deleteNotification, getNotifications}

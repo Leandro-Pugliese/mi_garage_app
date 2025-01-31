@@ -458,6 +458,7 @@ const acceptTransferVehicle = async (req, res) => {
 
 const cancelTransferVehicle = async (req, res) => {
     const {id} = req.params;
+    const session = await mongoose.startSession();
     try {
         const token = req.header("Authorization");
         if (!token) {
@@ -478,39 +479,25 @@ const cancelTransferVehicle = async (req, res) => {
         if (transfer.status === 'Complete') {
             return res.status(403).send('La transferencia ya fue realizada, no puedes cancelarla.');
         }
-        //Modifico el status de la transferencia
-        await Transfers.updateOne({_id: transfer._id},{
-            $set: {
-                status: 'Canceled',
-                updated: new Date(Date.now())
-            }
-        });
-        const newNotification = {
-            id: uuidv4(),
-            title: 'Transferencia de vehículo',
-            message: `Cancelaste la transferencia de tu vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} dominio ${transfer.vehicle.patente} con el usuario ${transfer.newOwner}`,
-            date: new Date(Date.now()),
-            read: false
-        }
-        await Users.updateOne({_id: user._id},{
-            $push: {
-                notifications:newNotification
-            }
-        });
         const userOther = await Users.findOne({email: transfer.newOwner});
-        if (userOther) {
-            const newOtherNotification = {
-                id: uuidv4(),
-                title: 'Transferencia de vehículo',
-                message: `El usuario ${user.email} canceló la transferencia del vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} dominio ${transfer.vehicle.patente}.`,
-                date: new Date(Date.now()),
-                read: false
-            }
-            await Users.updateOne({_id: userOther._id},{
-                $push: {
-                    notifications: newOtherNotification
+        session.startTransaction();
+        if (userOther) { //Si existe el otro usuario, creo ambas notificaciones.
+            await Notifications.create([
+                {
+                    user: user._id,
+                    title: 'Transferencia de vehículo',
+                    message: `Cancelaste la transferencia de tu vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} dominio ${transfer.vehicle.patente} con el usuario ${transfer.newOwner}`,
+                    date: new Date(Date.now()),
+                    read: false
+                },
+                {
+                    user: userOther._id,
+                    title: 'Transferencia de vehículo',
+                    message: `El usuario ${user.email} canceló la transferencia del vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} dominio ${transfer.vehicle.patente}.`,
+                    date: new Date(Date.now()),
+                    read: false
                 }
-            })
+            ], {session});
             const { error } = await resend.emails.send({
                 from: 'Mi Garage <soporteMiGarage@leandro-pugliese.com>',
                 to: [userOther.email],
@@ -522,9 +509,28 @@ const cancelTransferVehicle = async (req, res) => {
             if (error) {
                 console.log(error)
             }
+        } else { //Si el otro usuario fue eliminado, solo genero la notificación para el usuario que cancela la operación.
+            await Notifications.create({
+                user: user._id,
+                title: 'Transferencia de vehículo',
+                message: `Cancelaste la transferencia de tu vehículo ${transfer.vehicle.brand} ${transfer.vehicle.model} dominio ${transfer.vehicle.patente} con el usuario ${transfer.newOwner}`,
+                date: new Date(Date.now()),
+                read: false
+            }, {session})
         }
+        //Modifico el status de la transferencia
+        await Transfers.updateOne({_id: transfer._id},{
+            $set: {
+                status: 'Canceled',
+                updated: new Date(Date.now())
+            }
+        }, {session});
+        await session.commitTransaction();
+        session.endSession();
         return res.status(201).send(`Transferencia del vehículo ${transfer.vehicle.patente} cancelada.`);
     } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         console.log(error);
         return res.status(500).send(error.message);
     }
