@@ -294,37 +294,54 @@ const acceptTransferVehicle = async (req, res) => {
     const {token} = req.params; //Token de la tranferencia.
     const {accepted} = req.body; //true/false
     const session = await mongoose.startSession();//Creo la sesion para evitar inconsistencias en los updates.
+    session.startTransaction();
     try {
         const {id} = jwt.decode(token, {complete: true}).payload
-        const transfer = await Transfers.findOne({_id: id});
+        const transfer = await Transfers.findOne({_id: id}).session(session);
         if (!transfer) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).send('Transferencia no encontrada en la base de datos.');
         }
         if (transfer.status === 'Complete') {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('La transferencia ya fue completada.');
         }
         if (transfer.status !== 'Active') {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('La transferencia no esta activa.');
         }
-        const oldOwner = await Users.findOne({email: transfer.owner});
+        const oldOwner = await Users.findOne({email: transfer.owner}).session(session);
         if (!oldOwner) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).send('Dueño no encontrado en la base de datos.');
         }
-        const vehicle = await Vehicles.findOne({_id: transfer.vehicle.id});
+        const vehicle = await Vehicles.findOne({_id: transfer.vehicle.id}).session(session);
         if (!vehicle) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).send('Vehículo no encontrado en la base de datos.');
         }
-        const newOwner = await Users.findOne({email: transfer.newOwner});
+        const newOwner = await Users.findOne({email: transfer.newOwner}).session(session);
         if (!newOwner) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).send('Próximo dueño no encontrado en la base de datos.');
         }
         if ((newOwner.vehicles.length >= 1) && (newOwner.premiumType === 'Default')) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan a premium para agegar más vehículos.');
         }
         if ((newOwner.vehicles.length >= 3) && (newOwner.premiumType === 'Basic')) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan Basic a Plus para poder agregar más vehículos.');
         }
-        session.startTransaction(); //Inicializo la session aca, para utilizarla con los updates y las notificaciones.
+        //session.startTransaction(); //Inicializo la session aca, para utilizarla con los updates y las notificaciones.
         if (accepted === true) {
             //Envio notificaciones y correo con info de la trasferencia a oldOwner
             await Notifications.create([

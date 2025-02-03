@@ -7,7 +7,7 @@ const readNotification = async (req, res) => {
         if (!Array.isArray(notificationsList) || notificationsList.length === 0) {
             return res.status(400).send("Debe proporcionar una lista de notificaciones.");
         }
-        await Notifications.updateMany({_id: {$in: notificationsList}},
+        const result = await Notifications.updateMany({_id: {$in: notificationsList}},
             {
                 $set: {
                     read: true
