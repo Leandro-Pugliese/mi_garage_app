@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const socket = require("./socket");
 require("dotenv").config();
 const { db } = require("./db/db");
 const Router = require('./routes/routes');
@@ -20,4 +21,11 @@ cronJob3();
 cronJob4();
 //createPlans();
 
-app.listen(process.env.PORT, () => console.log(`Server running at port: ${process.env.PORT}`));
+// Servidor HTTP
+const http = require("http");
+const server = http.createServer(app);
+
+// Inicializo Socket.io
+socket.init(server);
+
+server.listen(process.env.PORT, () => console.log(`Server running at port: ${process.env.PORT}`));

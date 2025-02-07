@@ -283,6 +283,22 @@ const sendTransferVehicle = async (req, res) => {
                 read: false
             }
         ]);
+
+        // Emisión de eventos con websocket
+        const socket = require("../socket").getIO();
+        // Emito el evento al usuario que envió la transferencia
+        socket.to(user._id.toString()).emit("newNotification", {
+            title: 'Transferencia de vehículo',
+            message: `Enviaste una solicitud de transferencia de tu vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente} al usuario ${newOwner.email}`,
+            date: new Date()
+        });
+        // Emito el evento al usuario receptor
+        socket.to(newOwner._id.toString()).emit("newNotification", {
+            title: 'Transferencia de vehículo',
+            message: `El usuario ${user.email} te envió una solicitud de transferencia del vehículo ${vehicle.brand} ${vehicle.model} dominio ${vehicle.patente}. Revisa tu casilla de correo para responder.`,
+            date: new Date()
+        });
+
         return res.status(201).end('Solicitud de transferencia de vehículo enviada exitosamente.');
     } catch (error) {
         console.log(error);
@@ -360,6 +376,22 @@ const acceptTransferVehicle = async (req, res) => {
                     read: false
                 }
             ], {session});
+
+            // Emisión de eventos con el websocket
+            const socket = require("../socket").getIO();
+            // Emito el evento al usuario que envió la transferencia
+            socket.to(oldOwner._id.toString()).emit("newNotification", {
+                title: 'Transferencia de vehículo',
+                message: `El usuario ${newOwner.email} aceptó la transferencia del vehículo ${vehicle.brand} ${vehicle.model} dominio ${vehicle.patente}. Ya no tienes más acceso al mismo.`,
+                date: new Date(Date.now())
+            });
+            // Emito el evento al usuario receptor
+            socket.to(newOwner._id.toString()).emit("newNotification", {
+                title: 'Transferencia de vehículo',
+                message: `Se completó la transferencia del vehículo ${vehicle.brand} ${vehicle.model} dominio ${vehicle.patente} con el usuario ${newOwner.email}, puedes acceder al mismo desde "Mis Vehículos".`,
+                date: new Date(Date.now())
+            });
+
             //Modifico el vehiculo
             await Vehicles.updateOne({_id: vehicle._id},{
                 $push: {
@@ -441,6 +473,22 @@ const acceptTransferVehicle = async (req, res) => {
                     read: false
                 }
             ], {session})
+
+            // Emisión de eventos con el websocket
+            const socket = require("../socket").getIO();
+            // Emito el evento al usuario que envió la transferencia
+            socket.to(oldOwner._id.toString()).emit("newNotification", {
+                title: 'Transferencia de vehículo',
+                message: `El usuario ${newOwner.email} rechazó la transferencia de tu vehículo ${vehicle.brand} ${vehicle.model} dominio ${vehicle.patente}.`,
+                date: new Date(Date.now())
+            });
+            // Emito el evento al usuario receptor
+            socket.to(newOwner._id.toString()).emit("newNotification", {
+                title: 'Transferencia de vehículo',
+                message: `Rechazaste la transferencia del vehículo ${vehicle.brand} ${vehicle.model} patente ${vehicle.patente} con el usuario ${newOwner.email}`,
+                date: new Date(Date.now())
+            });
+
             //Modifico el status de la transferencia
             await Transfers.updateOne({_id: transfer._id},{
                 $set: {
