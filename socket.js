@@ -6,7 +6,7 @@ module.exports = {
   init: (server) => {
     io = require("socket.io")(server, {
       cors: {
-        origin: "*", // Puedes restringir el origen según tu frontend
+        origin: "*", // Se puede restringir el origen según el frontend
         methods: ["GET", "POST"]
       }
     });
