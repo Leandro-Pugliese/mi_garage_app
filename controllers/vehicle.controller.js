@@ -506,29 +506,46 @@ const acceptTransferVehicle = async (req, res) => {
 
 const cancelTransferVehicle = async (req, res) => {
     const {id} = req.params;
+    const {password} = req.body;
     const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         const token = req.header("Authorization");
         if (!token) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('No se detecto un token en la petición.')
         }
         const {_id} = jwt.decode(token, {complete: true}).payload
-        const user = await Users.findOne({_id: _id});
+        const user = await Users.findOne({_id: _id}).session(session);
         if (!user) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).send("Usuario no encontrado, token inválido.");
         }
-        const transfer = await Transfers.findOne({_id: id});
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(403).send("Contraseña incorrecta.");
+        }
+        const transfer = await Transfers.findOne({_id: id}).session(session);
         if (!transfer) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).send('Transferencia no encontrada en la base de datos.');
         }
         if (transfer.owner !== user.email) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('La transferencia no pertenece a tu usuario.');
         }
         if (transfer.status === 'Complete') {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).send('La transferencia ya fue realizada, no puedes cancelarla.');
         }
-        const userOther = await Users.findOne({email: transfer.newOwner});
-        session.startTransaction();
+        const userOther = await Users.findOne({email: transfer.newOwner}).session(session);
         if (userOther) { //Si existe el otro usuario, creo ambas notificaciones.
             await Notifications.create([
                 {
@@ -607,4 +624,23 @@ const getDataTransfer = async(req, res) => {
     }
 }
 
-module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle, acceptTransferVehicle, cancelTransferVehicle, getDataTransfer}
+const getUserTransfers = async(req, res) => {
+    try {
+        const token = req.header("Authorization");
+        if (!token) {
+            return res.status(403).send('No se detecto un token en la petición.')
+        }
+        const {email} = jwt.decode(token, {complete: true}).payload;
+        const transfers = await Transfers.find({
+            $or: [{owner: email}, {newOwner: email}]
+        }).sort({ date: -1 });
+        if (!transfers || transfers.length === 0) {
+            return res.status(404).send('Transferencias no encontradas en la base de datos.');
+        }
+        return res.status(200).send(transfers);
+    } catch (error) {
+        return res.status(500).send(error.message);
+    }
+}
+
+module.exports = {createVehicle, vehicleData, vehicleList, updateVehicle, deleteVehicle, sendTransferVehicle, acceptTransferVehicle, cancelTransferVehicle, getDataTransfer, getUserTransfers}
