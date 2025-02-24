@@ -10,17 +10,11 @@ const bcrypt = require("bcrypt");
 require("dotenv").config();
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND);
-const { v4: uuidv4 } = require('uuid');
 
 const createVehicle = async (req, res) => {
     const {type, brand, model, year, patente, fuel, gnc, seguro, use, km} = req.body;
     try {
-        const token = req.header("Authorization");
-        if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
-        }
-        const {_id} = jwt.decode(token, {complete: true}).payload
-        const user = await Users.findOne({_id: _id});
+        const user = await Users.findOne({_id: req.user._id});
         if (!user) {
             return res.status(404).send("Usuario no encontrado, token inválido.");
         }
@@ -84,12 +78,7 @@ const vehicleData = async (req, res) => {
 
 const vehicleList = async (req, res) => {
     try {
-        const token = req.header("Authorization");
-        if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
-        }
-        const {_id} = jwt.decode(token, {complete: true}).payload
-        const user = await Users.findOne({_id: _id});
+        const user = await Users.findOne({_id: req.user._id});
         if (!user) {
             return res.status(404).send("Usuario no encontrado, token inválido.");
         }
@@ -141,19 +130,14 @@ const updateVehicle = async (req, res) => {
 
 const deleteVehicle = async (req, res) => {
     const {id} = req.params //vehiculoID
-    const {body} = req; //Password
+    const {password} = req.body;
     try {
-        const token = req.header("Authorization");
-        if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
-        }
-        const {_id} = jwt.decode(token, {complete: true}).payload
-        const user = await Users.findOne({_id: _id});
+        const user = await Users.findOne({_id: req.user._id});
         if (!user) {
             return res.status(403).send("Usuario no encontrado, token inválido.");
         }
         //Chequeo de contraseña
-        const isMatch = await bcrypt.compare(body.password, user.password);
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(403).send("Contraseña incorrecta.");
         }
@@ -626,13 +610,8 @@ const getDataTransfer = async(req, res) => {
 
 const getUserTransfers = async(req, res) => {
     try {
-        const token = req.header("Authorization");
-        if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
-        }
-        const {email} = jwt.decode(token, {complete: true}).payload;
         const transfers = await Transfers.find({
-            $or: [{owner: email}, {newOwner: email}]
+            $or: [{owner: req.user.email}, {newOwner: req.user.email}]
         }).sort({ date: -1 });
         if (!transfers || transfers.length === 0) {
             return res.status(404).send('Transferencias no encontradas en la base de datos.');

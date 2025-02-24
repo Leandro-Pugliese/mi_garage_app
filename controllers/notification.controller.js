@@ -26,16 +26,22 @@ const readNotification = async (req, res) => {
 }
 
 const deleteNotification = async (req, res) => {
-    const {notifications} = req.body; //Array con ids de notificaciones a eliminar.
+    const {selectedForDeletion} = req.body; //Array con ids de notificaciones a eliminar.
     try {
-        if(notifications.length === 0) {
+        if(selectedForDeletion.length === 0) {
             return res.status(400).send('No se enviaron ids de notificaciones para eliminar.');
         }
-        await Notifications.deleteMany({_id: {$in: notifications}});
-        if (notifications.length === 1) {
+        await Notifications.deleteMany({_id: {$in: selectedForDeletion}});
+        // Emisión de eventos con websocket para actaulizar notificaciones en tiempo real.
+        const socket = require("../socket").getIO();
+        // Emito el evento al usuario que envió la transferencia
+        socket.to(req.user._id.toString()).emit("newNotification", {
+            message: 'Nueva notificación recibida'
+        });
+        if (selectedForDeletion.length === 1) {
             return res.status(200).send('Notificación eliminada.')
         } else {
-            return res.status(200).send(`Se eliminaron ${notifications.length} notificacones.`)
+            return res.status(200).send(`Se eliminaron ${selectedForDeletion.length} notificacones.`)
         }
     } catch (error) {
         return res.status(500).send(error.message);
