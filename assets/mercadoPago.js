@@ -24,11 +24,11 @@ const createPreference = async (req, res) => {
     if (!user) {
         return res.status(403).send('Usuario no encontrado, token inválido.');
     }
+    const premiumExpirationDate = new Date(user.premiumExpiration);
+    const currentDate = new Date(Date.now());
     // Si el usuario ya tiene premium y quiere renovar su plan, tiene que ser dentro de los 7 días anteriores a su vencimiento, antes no puede hacerlo.
     if (user.premium && !upgrade) {
         //La fecha de vencimiento tiene que estar dentro de los proximos 7 dias para qeu puedas renovar la membresia
-        const premiumExpirationDate = new Date(user.premiumExpiration);
-        const currentDate = new Date(Date.now());
         // Resto 7 días a la fecha de vencimiento.
         const checkDate = subDays(premiumExpirationDate, 7);
         // Chequeo si no estoy a 7 días o menos de la fecha de vencimiento.
@@ -52,7 +52,7 @@ const createPreference = async (req, res) => {
         const upgradeDays = differenceInDays(premiumExpirationDate, currentDate);
         console.log(upgradeDays, typeof upgradeDays);
         if (upgradeDays <= 0) {
-            return res.status(403).send('No te quedan días restantes para mejorar tu plan, puedes contratar el plan qeu desees.');
+            return res.status(403).send('No te quedan días restantes para mejorar tu plan, puedes contratar el plan que desees.');
         }
         const currentPlan = await Plans.findOne({type: user.premiumType});
         if (!currentPlan) {
