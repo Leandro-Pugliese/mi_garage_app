@@ -129,6 +129,9 @@ const createActivityPremium = async (req, res) => {
             MAX_STORAGE_LIMIT_MB = 500;
         } 
         if (user.premiumType === 'Plus') {
+            MAX_STORAGE_LIMIT_MB = 1000;
+        } 
+        if (user.premiumType === 'Full') {
             MAX_STORAGE_LIMIT_MB = 2000;
         }
         // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary.
@@ -266,7 +269,7 @@ const updateActivityPremium = async (req, res) => {
     try {
         const token = req.header("Authorization");
         if (!token) {
-            return res.status(403).send('No se detecto un token en la petición.')
+            return res.status(403).send('No se detecto un token en la petición.');
         }
         const {_id} = jwt.decode(token, {complete: true}).payload
         const user = await Users.findOne({_id: _id});
@@ -313,6 +316,9 @@ const updateActivityPremium = async (req, res) => {
                 MAX_STORAGE_LIMIT_MB = 500;
             } 
             if (user.premiumType === 'Plus') {
+                MAX_STORAGE_LIMIT_MB = 1000;
+            }
+            if (user.premiumType === 'Full') {
                 MAX_STORAGE_LIMIT_MB = 2000;
             }
             // Si hay imagen convierto el buffer a stream par subir la imagen a claudinary

@@ -65,7 +65,7 @@ const createPreference = async (req, res) => {
         //Sumo el monto restante del upgrade al percio de otro mes completo de premium.
         planAmount = selectedPlan.amount + remainingAmount;
         // Agrego string para identificar que es un upgrade
-        const upgradeText = ' + upgrade plan Basic a Plus';
+        const upgradeText = ` + upgrade plan ${currentPlan.name} a plan ${selectedPlan.name}`;
         planDescription = selectedPlan.description + upgradeText;
     }
     const preference = new mercadopago.Preference(new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESTOKEN_PRUEBA }))
@@ -168,7 +168,12 @@ const paymentNotification = async (req, res) => {
                             }
                         )
                         //Veo cuantos vehículos activar según el plan abonado
-                        const maxActiveVehicles = user.premiumType === 'Basic' ? 3 : user.vehicles.length;
+                        let maxActiveVehicles = user.vehicles.length; //Todos habilitados en plan Full
+                        if (user.premiumType === 'Basic') {
+                            maxActiveVehicles = 3;
+                        } else if (user.premiumType === 'Plus') {
+                            maxActiveVehicles = 10;
+                        }
                         // Activo los vehículos 
                         await Promise.all(
                             user.vehicles.map((vehicle, index) => {
@@ -285,7 +290,12 @@ const paymentRedirect = async (req, res) => {
                     }
                 )
                 //Veo cuantos vehículos activar según el plan abonado
-                const maxActiveVehicles = user.premiumType === 'Basic' ? 3 : user.vehicles.length;
+                let maxActiveVehicles = user.vehicles.length; //Todos habilitados en plan Full
+                if (user.premiumType === 'Basic') {
+                    maxActiveVehicles = 3;
+                } else if (user.premiumType === 'Plus') {
+                    maxActiveVehicles = 10;
+                }
                 // Activo los vehículos 
                 await Promise.all(
                     user.vehicles.map((vehicle, index) => {

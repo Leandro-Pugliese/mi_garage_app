@@ -25,7 +25,10 @@ const createVehicle = async (req, res) => {
         }
         // Si el usuario es premium basic solo puede tener hasta un máximo de 3 vehiculos.
         if ((vehiculosUsuario.length >= 3) && (user.premium === true) && (user.premiumType === 'Basic')) {
-            return res.status(403).send("Máximo de vehículos para plan Basic alcanzado (3), tiene que ser premium PLUS para poder agregar más vehículos.");
+            return res.status(403).send("Máximo de vehículos para plan Basic alcanzado (3), tiene que ser premium PLUS o FULL para poder agregar más vehículos.");
+        }
+        if ((vehiculosUsuario.length >= 10) && (user.premium === true) && (user.premiumType === 'Plus')) {
+            return res.status(403).send("Máximo de vehículos para plan Plus alcanzado (10), tiene que ser premium FULL para poder agregar más vehículos.");
         }
         //Creamos el vehículo
         const vehicle = await Vehicles.create({
@@ -184,6 +187,9 @@ const sendTransferVehicle = async (req, res) => {
         if ((user.premiumType === 'Basic') && (user.transferIterations === 2)) {
             return res.status(403).send("Ya utilizaste la cantidad máxima de transferencias de vehículos de tu plan este mes.");
         }
+        if ((user.premiumType === 'Plus') && (user.transferIterations === 10)) {
+            return res.status(403).send("Ya utilizaste la cantidad máxima de transferencias de vehículos de tu plan este mes.");
+        }
         const newOwner = await Users.findOne({email: newOwnerEmail});
         if (!newOwner) {
             return res.status(404).send("No hay un usuario registrado con el email ingresado.");
@@ -195,6 +201,9 @@ const sendTransferVehicle = async (req, res) => {
             return res.status(403).send(`El usuario ${newOwner.email} no puede tener más vehiculos registrados.`);
         }
         if (newOwner.premium && newOwner.premiumType === 'Basic' &&  newOwner.vehicles.length >= 3) {
+            return res.status(403).send(`El usuario ${newOwner.email} no puede tener más vehiculos registrados.`);
+        }
+        if (newOwner.premium && newOwner.premiumType === 'Plus' &&  newOwner.vehicles.length >= 10) {
             return res.status(403).send(`El usuario ${newOwner.email} no puede tener más vehiculos registrados.`);
         }
         const vehicle = await Vehicles.findOne({_id: id});
@@ -331,6 +340,11 @@ const acceptTransferVehicle = async (req, res) => {
             return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan a premium para agegar más vehículos.');
         }
         if ((newOwner.vehicles.length >= 3) && (newOwner.premiumType === 'Basic')) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan Basic a Plus para poder agregar más vehículos.');
+        }
+        if ((newOwner.vehicles.length >= 10) && (newOwner.premiumType === 'Plus')) {
             await session.abortTransaction();
             session.endSession();
             return res.status(403).send('No tienes espacio suficiente para agregar otro vehículo, mejora tu plan Basic a Plus para poder agregar más vehículos.');
